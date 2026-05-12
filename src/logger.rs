@@ -27,4 +27,3 @@ pub fn line(message: impl AsRef<str>) {
         }
     }
 }
-

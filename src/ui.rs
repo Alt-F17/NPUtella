@@ -1,3 +1,4 @@
+use crate::config::Language;
 use eframe::egui;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -5,6 +6,8 @@ pub const IDLE_W: f32 = 46.0;
 pub const IDLE_H: f32 = 18.0;
 pub const ACTIVE_W: f32 = 128.0;
 pub const ACTIVE_H: f32 = 30.0;
+pub const SIDE_PILL_W: f32 = 52.0;
+pub const LANGUAGE_GAP: f32 = 8.0;
 pub const SCREEN_BOTTOM_OFFSET: f32 = 60.0;
 pub const WINDOW_PAD: f32 = 5.0;
 
@@ -30,6 +33,8 @@ pub enum AppEvent {
     AudioLevel(f32),
     TranscriptionDone(String),
     TranscriptionError(String),
+    OpenDictionaryManager,
+    Quit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -131,9 +136,8 @@ impl OverlayState {
         self.collapse_at = Some(Instant::now() + Duration::from_millis(500));
     }
 
-    pub fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, hover_t: f32, morph_t: f32) {
-        let painter = ui.painter_at(rect);
-        let available = rect.shrink(WINDOW_PAD);
+    pub fn pill_rect(bounds: egui::Rect, hover_t: f32, morph_t: f32) -> egui::Rect {
+        let available = bounds.shrink(WINDOW_PAD);
         let shape_t = smoothstep(morph_t);
         let width_t = ease_out_cubic(morph_t);
         let hover_push = hover_t * (1.0 - shape_t);
@@ -141,10 +145,61 @@ impl OverlayState {
             lerp(IDLE_W, ACTIVE_W, width_t) + 4.0 * hover_push,
             lerp(IDLE_H, ACTIVE_H, shape_t) + 2.0 * hover_push,
         );
-        let rect = egui::Rect::from_center_size(available.center(), size);
+        egui::Rect::from_center_size(available.center(), size)
+    }
+
+    pub fn language_rect(bounds: egui::Rect, hover_t: f32, morph_t: f32) -> egui::Rect {
+        let pill = Self::pill_rect(bounds, hover_t, morph_t);
+        let visible = smoothstep(hover_t) * (1.0 - smoothstep(morph_t));
+        let final_x = pill.right() + LANGUAGE_GAP + SIDE_PILL_W * 0.5;
+        let center_x = lerp(pill.center().x, final_x, ease_out_cubic(visible));
+        egui::Rect::from_center_size(
+            egui::pos2(center_x, pill.center().y),
+            egui::vec2(SIDE_PILL_W, IDLE_H + 2.0),
+        )
+    }
+
+    pub fn dictionary_rect(bounds: egui::Rect, hover_t: f32, morph_t: f32) -> egui::Rect {
+        let pill = Self::pill_rect(bounds, hover_t, morph_t);
+        let visible = smoothstep(hover_t) * (1.0 - smoothstep(morph_t));
+        let final_x = pill.left() - LANGUAGE_GAP - SIDE_PILL_W * 0.5;
+        let center_x = lerp(pill.center().x, final_x, ease_out_cubic(visible));
+        egui::Rect::from_center_size(
+            egui::pos2(center_x, pill.center().y),
+            egui::vec2(SIDE_PILL_W, IDLE_H + 2.0),
+        )
+    }
+
+    pub fn paint(
+        &self,
+        ui: &mut egui::Ui,
+        rect: egui::Rect,
+        hover_t: f32,
+        morph_t: f32,
+        language: Language,
+    ) {
+        let painter = ui.painter_at(rect);
+        let shape_t = smoothstep(morph_t);
+        let rect = Self::pill_rect(rect, hover_t, morph_t);
         let size = rect.size();
         let content_t = smoothstep(remap(morph_t, 0.18, 0.92));
         let idle_t = 1.0 - smoothstep(remap(morph_t, 0.0, 0.45));
+        paint_side_pill(
+            &painter,
+            Self::dictionary_rect(ui.max_rect(), hover_t, morph_t),
+            hover_t,
+            morph_t,
+            "dict",
+            8.0,
+        );
+        paint_side_pill(
+            &painter,
+            Self::language_rect(ui.max_rect(), hover_t, morph_t),
+            hover_t,
+            morph_t,
+            language.short_label(),
+            9.0,
+        );
         let bg = mix_color(
             egui::Color32::from_rgba_premultiplied(12, 12, 12, 225),
             egui::Color32::from_rgba_premultiplied(7, 7, 8, 238),
@@ -219,6 +274,37 @@ impl OverlayState {
             AppPhase::Idle => {}
         }
     }
+}
+
+fn paint_side_pill(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    hover_t: f32,
+    morph_t: f32,
+    label: &str,
+    font_size: f32,
+) {
+    let alpha = (smoothstep(hover_t) * (1.0 - smoothstep(morph_t))).clamp(0.0, 1.0);
+    if alpha <= 0.01 {
+        return;
+    }
+    painter.rect(
+        rect,
+        rect.height() * 0.5,
+        egui::Color32::from_rgba_premultiplied(10, 10, 11, (220.0 * alpha) as u8),
+        egui::Stroke::new(
+            1.0,
+            egui::Color32::from_rgba_premultiplied(255, 255, 255, (84.0 * alpha) as u8),
+        ),
+        egui::StrokeKind::Inside,
+    );
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(font_size),
+        egui::Color32::from_rgba_premultiplied(255, 255, 255, (230.0 * alpha) as u8),
+    );
 }
 
 fn paint_audio_bars(painter: &egui::Painter, rect: egui::Rect, level: f32, progress: f32) {

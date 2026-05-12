@@ -1,5 +1,5 @@
 """
-setup.py - installs dependencies and exports Whisper-Base-En ONNX models
+setup.py - installs dependencies and exports multilingual Whisper-Base ONNX models
 optimized for Snapdragon X Plus NPU via Qualcomm AI Hub Workbench.
 
 Requires:
@@ -16,11 +16,9 @@ import sys
 from pathlib import Path
 
 MODEL_ROOT = Path(__file__).parent / "models"
-RUNTIME_MODEL_DIR = (
-    MODEL_ROOT
-    / "whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core"
-)
+RUNTIME_MODEL_DIR = MODEL_ROOT / "whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core"
 DEVICE = "Snapdragon X Plus 8-Core CRD"
+EXPORT_MODULE = "qai_hub_models.models.whisper_base.export"
 
 
 def check_python_arch():
@@ -86,7 +84,7 @@ def normalize_model_layout() -> bool:
 def export_models():
     MODEL_ROOT.mkdir(exist_ok=True)
 
-    print(f"\nExporting Whisper-Base-En ONNX for: {DEVICE}")
+    print(f"\nExporting multilingual Whisper-Base ONNX for: {DEVICE}")
     print("This compiles on Qualcomm AI Hub cloud and downloads optimized ONNX.")
     print("Takes roughly 5-10 minutes on first run.\n")
 
@@ -94,7 +92,7 @@ def export_models():
         [
             sys.executable,
             "-m",
-            "qai_hub_models.models.whisper_base_en.export",
+            EXPORT_MODULE,
             "--target-runtime",
             "onnx",
             "--device",

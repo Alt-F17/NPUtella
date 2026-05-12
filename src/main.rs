@@ -1,17 +1,29 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod code_context;
+mod config;
+mod context;
+mod dictionary_manager;
+mod dictionary_store;
 mod hotkey;
 mod logger;
 mod mel;
+mod phonetic_dictionary;
+mod pipeline;
 mod single_instance;
 mod system;
+mod tray;
 mod ui;
 mod whisper;
 
 use anyhow::{Context, Result};
 use audio::AudioRecorder;
+use code_context::CodeContext;
+use config::{AppConfig, Language};
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use dictionary_manager::DictionaryManager;
+use dictionary_store::DictionaryStore;
 use eframe::{egui, App, NativeOptions, Renderer};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -72,6 +84,12 @@ struct NputellaApp {
     tx: Sender<AppEvent>,
     rx: Receiver<AppEvent>,
     engine: Arc<Mutex<Option<Arc<Mutex<WhisperEngine>>>>>,
+    config: Arc<AppConfig>,
+    code_context: Arc<CodeContext>,
+    dictionary: Arc<DictionaryStore>,
+    dictionary_manager: DictionaryManager,
+    language: Language,
+    show_dictionary_manager: bool,
     recorder: AudioRecorder,
     state: OverlayState,
     recording_since: Option<Instant>,
@@ -87,11 +105,21 @@ impl NputellaApp {
         tx: Sender<AppEvent>,
         rx: Receiver<AppEvent>,
         engine: Arc<Mutex<Option<Arc<Mutex<WhisperEngine>>>>>,
+        config: Arc<AppConfig>,
+        code_context: Arc<CodeContext>,
+        dictionary: Arc<DictionaryStore>,
     ) -> Self {
+        let language = config.language;
         Self {
             tx,
             rx,
             engine,
+            config,
+            code_context,
+            dictionary,
+            dictionary_manager: DictionaryManager::new(),
+            language,
+            show_dictionary_manager: false,
             recorder: AudioRecorder::new(),
             state: OverlayState::loading(),
             recording_since: None,
@@ -103,7 +131,7 @@ impl NputellaApp {
         }
     }
 
-    fn process_events(&mut self) {
+    fn process_events(&mut self, ctx: &egui::Context) {
         self.state.tick();
         while let Ok(event) = self.rx.try_recv() {
             match event {
@@ -120,6 +148,13 @@ impl NputellaApp {
                 AppEvent::TranscriptionError(msg) => {
                     self.state.finish_error(msg);
                     self.recording_since = None;
+                }
+                AppEvent::OpenDictionaryManager => {
+                    self.show_dictionary_manager = true;
+                    self.dictionary_manager.ensure_loaded(&self.dictionary);
+                }
+                AppEvent::Quit => {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             }
         }
@@ -169,6 +204,10 @@ impl NputellaApp {
         self.state.start_transcribing();
         let tx = self.tx.clone();
         let engine = self.engine.clone();
+        let config = self.config.clone();
+        let code_context = self.code_context.clone();
+        let dictionary = self.dictionary.clone();
+        let language = self.language;
         thread::spawn(move || {
             let engine = match engine.lock().ok().and_then(|guard| guard.as_ref().cloned()) {
                 Some(engine) => engine,
@@ -181,16 +220,39 @@ impl NputellaApp {
             let result = engine
                 .lock()
                 .map_err(|_| anyhow::anyhow!("engine lock poisoned"))
-                .and_then(|mut engine| engine.transcribe(&capture));
+                .and_then(|mut engine| engine.transcribe(&capture, language));
 
             match result {
                 Ok(text) if !text.trim().is_empty() => {
+                    let corrected =
+                        phonetic_dictionary::correct_text(&text, &dictionary.snapshot());
+                    let insert = if config.local_adaptation_enabled {
+                        let target = context::TargetContext::detect();
+                        pipeline::process_transcript(
+                            &corrected,
+                            &config,
+                            &target,
+                            &code_context,
+                            &dictionary,
+                        )
+                    } else {
+                        pipeline::InsertPlan {
+                            text: corrected.trim().to_string(),
+                            press_enter: false,
+                            skip_paste: false,
+                        }
+                    };
                     logger::line(format!(
-                        "transcription complete: {} chars",
-                        text.chars().count()
+                        "transcription complete: raw_chars={} final_chars={} press_enter={} skip_paste={}",
+                        text.chars().count(),
+                        insert.text.chars().count(),
+                        insert.press_enter,
+                        insert.skip_paste
                     ));
-                    let _ = system::copy_and_paste(&text);
-                    let _ = tx.send(AppEvent::TranscriptionDone(text));
+                    if !insert.skip_paste {
+                        let _ = system::insert_text(&insert);
+                    }
+                    let _ = tx.send(AppEvent::TranscriptionDone(insert.text));
                 }
                 Ok(_) => {
                     logger::line("transcription produced no text");
@@ -238,9 +300,23 @@ impl App for NputellaApp {
             .clamp(1.0 / 240.0, 1.0 / 30.0);
         self.last_frame = now;
 
-        self.process_events();
+        self.process_events(ctx);
 
-        let pointer_hovered = ctx.input(|i| i.pointer.hover_pos().is_some());
+        let bounds =
+            egui::Rect::from_min_size(egui::Pos2::ZERO, ctx.input(|i| i.content_rect().size()));
+        let pill_rect = OverlayState::pill_rect(bounds, self.hover_t, self.morph_t);
+        let language_rect = OverlayState::language_rect(bounds, self.hover_t, self.morph_t);
+        let dictionary_rect = OverlayState::dictionary_rect(bounds, self.hover_t, self.morph_t);
+        let pointer_hovered = ctx.input(|i| {
+            i.pointer
+                .hover_pos()
+                .map(|pos| {
+                    pill_rect.contains(pos)
+                        || language_rect.contains(pos)
+                        || dictionary_rect.contains(pos)
+                })
+                .unwrap_or(false)
+        });
         self.state.hovered = pointer_hovered;
         let hover_target = if pointer_hovered && self.state.phase == AppPhase::Idle {
             1.0
@@ -261,7 +337,10 @@ impl App for NputellaApp {
         };
         self.morph_t = approach(self.morph_t, morph_target, morph_speed, dt);
 
-        let target_size = egui::vec2(ui::ACTIVE_W, ui::ACTIVE_H);
+        let target_size = egui::vec2(
+            ui::SIDE_PILL_W + ui::LANGUAGE_GAP + ui::ACTIVE_W + ui::LANGUAGE_GAP + ui::SIDE_PILL_W,
+            ui::ACTIVE_H,
+        );
         self.update_window_geometry(ctx, target_size);
         if (self.hover_t - hover_target).abs() > 0.001
             || (self.morph_t - morph_target).abs() > 0.001
@@ -278,16 +357,38 @@ impl App for NputellaApp {
         ui.visuals_mut().widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
         let rect = ui.max_rect();
-        let response = ui.allocate_rect(rect, egui::Sense::click());
-        if response.clicked() {
+        let pill_rect = OverlayState::pill_rect(rect, self.hover_t, self.morph_t);
+        let language_rect = OverlayState::language_rect(rect, self.hover_t, self.morph_t);
+        let dictionary_rect = OverlayState::dictionary_rect(rect, self.hover_t, self.morph_t);
+        let dictionary_response = ui.allocate_rect(dictionary_rect, egui::Sense::click());
+        let language_response = ui.allocate_rect(language_rect, egui::Sense::click());
+        let pill_response = ui.allocate_rect(pill_rect, egui::Sense::click());
+        if dictionary_response.clicked() && self.state.phase == AppPhase::Idle {
+            self.show_dictionary_manager = true;
+            self.dictionary_manager.ensure_loaded(&self.dictionary);
+            logger::line("dictionary manager opened from overlay");
+        } else if language_response.clicked() && self.state.phase == AppPhase::Idle {
+            self.language = self.language.cycle();
+            logger::line(format!("language toggled to {:?}", self.language));
+        } else if pill_response.clicked() {
             if self.state.phase == AppPhase::Recording {
                 self.stop_recording();
             } else if self.state.phase == AppPhase::Idle {
                 self.start_recording();
             }
         }
-        self.state.hovered = response.hovered();
-        self.state.paint(ui, rect, self.hover_t, self.morph_t);
+        self.state.hovered =
+            pill_response.hovered() || language_response.hovered() || dictionary_response.hovered();
+        self.state
+            .paint(ui, rect, self.hover_t, self.morph_t, self.language);
+
+        if self.show_dictionary_manager {
+            self.dictionary_manager.show(
+                ui.ctx(),
+                &mut self.show_dictionary_manager,
+                self.dictionary.clone(),
+            );
+        }
     }
 }
 
@@ -344,6 +445,19 @@ fn main() -> Result<()> {
 
     let (tx, rx) = unbounded::<AppEvent>();
     let engine_slot: Arc<Mutex<Option<Arc<Mutex<WhisperEngine>>>>> = Arc::new(Mutex::new(None));
+    let config = Arc::new(AppConfig::load(&root));
+    logger::line(format!(
+        "config: language={:?} adaptation={} smart={} code={} math={} llm_enabled={} llm_model={}",
+        config.language,
+        config.local_adaptation_enabled,
+        config.smart_formatting,
+        config.code_formatting,
+        config.math_formatting,
+        config.local_llm_enabled,
+        config.local_llm_model
+    ));
+    let code_context = Arc::new(CodeContext::load(&root));
+    let dictionary = Arc::new(DictionaryStore::load(&root, config.dictionary.clone()));
 
     {
         let tx = tx.clone();
@@ -385,6 +499,7 @@ fn main() -> Result<()> {
     }
 
     hotkey::spawn_hotkey_hook(tx.clone());
+    tray::spawn_tray(tx.clone());
 
     let native_options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -394,7 +509,12 @@ fn main() -> Result<()> {
             .with_taskbar(false)
             .with_resizable(false)
             .with_inner_size([
-                ui::ACTIVE_W + ui::WINDOW_PAD * 2.0,
+                ui::SIDE_PILL_W
+                    + ui::LANGUAGE_GAP
+                    + ui::ACTIVE_W
+                    + ui::LANGUAGE_GAP
+                    + ui::SIDE_PILL_W
+                    + ui::WINDOW_PAD * 2.0,
                 ui::ACTIVE_H + ui::WINDOW_PAD * 2.0,
             ])
             .with_title("nputella"),
@@ -416,6 +536,9 @@ fn main() -> Result<()> {
                 tx_for_app.clone(),
                 rx,
                 engine_slot,
+                config,
+                code_context,
+                dictionary,
             )))
         }),
     )

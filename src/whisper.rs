@@ -1,13 +1,12 @@
 use crate::audio::Capture;
+use crate::config::Language;
 use crate::logger;
 use crate::mel::audio_to_mel;
 use anyhow::{anyhow, Context, Result};
 use half::f16;
 use ndarray::Array4;
 use ort::execution_providers::qnn::QNNPerformanceMode;
-use ort::execution_providers::{
-    ExecutionProviderDispatch, QNNExecutionProvider,
-};
+use ort::execution_providers::{ExecutionProviderDispatch, QNNExecutionProvider};
 use ort::session::Session;
 use ort::value::TensorRef;
 use std::path::Path;
@@ -18,15 +17,18 @@ const LEGACY_EOT: i64 = 50_256;
 const NOTIMESTAMPS: i64 = 50_363;
 const TRANSCRIBE: i64 = 50_359;
 const LANG_EN: i64 = 50_259;
+const LANG_FR: i64 = 50_265;
 const MAX_DECODE: usize = 199;
 const FIRST_SPECIAL: i64 = 50_257;
 
-const MODEL_DIR_NAME: &str = "whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core";
+const MODEL_DIR_NAME: &str =
+    "whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core";
 
 pub struct WhisperEngine {
     encoder: Session,
     decoder: Session,
     tokenizer: tokenizers::Tokenizer,
+    bias: DecoderBias,
 }
 
 impl WhisperEngine {
@@ -87,14 +89,16 @@ impl WhisperEngine {
             .with_context(|| format!("loading decoder from {}", decoder_path.display()))?;
         logger::line("loading tokenizer");
         let tokenizer = load_tokenizer(&root.join("whisper-base-local"))?;
+        let bias = DecoderBias::disabled();
         Ok(Self {
             encoder,
             decoder,
             tokenizer,
+            bias,
         })
     }
 
-    pub fn transcribe(&mut self, capture: &Capture) -> Result<String> {
+    pub fn transcribe(&mut self, capture: &Capture, language: Language) -> Result<String> {
         let audio = resample_to_16k(&capture.samples, capture.sample_rate);
         logger::line(format!(
             "transcribe audio: input_samples={} input_rate={} mel_samples={}",
@@ -122,9 +126,9 @@ impl WhisperEngine {
         ));
         let mel = mel.insert_axis(ndarray::Axis(0));
 
-        let enc_outputs = self.encoder.run(ort::inputs![
-            TensorRef::from_array_view(mel.view())?
-        ])?;
+        let enc_outputs = self
+            .encoder
+            .run(ort::inputs![TensorRef::from_array_view(mel.view())?])?;
 
         let mut cross_k = Vec::with_capacity(6);
         let mut cross_v = Vec::with_capacity(6);
@@ -149,9 +153,14 @@ impl WhisperEngine {
             .collect();
         let mut attention_mask = Array4::from_elem((1, 1, 1, 200), f16::from_f32(-100.0));
 
+        let mut output_ids = match language {
+            Language::Auto => vec![SOT],
+            Language::English | Language::French => prompt_tokens(language),
+        };
         let prompt_len = 4;
-        let mut output_ids = vec![SOT, LANG_EN, TRANSCRIBE, NOTIMESTAMPS];
+        logger::line(format!("decoder prompt tokens: {:?}", output_ids));
         let mut position_id = 0i32;
+        let mut detected_language = None;
 
         for n in 0..MAX_DECODE {
             let input_id = *output_ids.get(n).unwrap_or(output_ids.last().unwrap());
@@ -194,11 +203,28 @@ impl WhisperEngine {
             let mut best_token = 0i64;
             let mut best_score = f32::NEG_INFINITY;
             for (idx, value) in logits.iter().enumerate() {
-                let score = f32::from(*value);
+                let score = f32::from(*value) + self.bias.score(idx as i64, &output_ids);
                 if score > best_score {
                     best_score = score;
                     best_token = idx as i64;
                 }
+            }
+            if language == Language::Auto && detected_language.is_none() {
+                let en_score = token_score(&logits, LANG_EN).unwrap_or(f32::NEG_INFINITY);
+                let fr_score = token_score(&logits, LANG_FR).unwrap_or(f32::NEG_INFINITY);
+                let lang = if fr_score > en_score {
+                    LANG_FR
+                } else {
+                    LANG_EN
+                };
+                detected_language = Some(lang);
+                output_ids.push(lang);
+                output_ids.push(TRANSCRIBE);
+                output_ids.push(NOTIMESTAMPS);
+                logger::line(format!(
+                    "detected language token={} en_score={:.4} fr_score={:.4}",
+                    lang, en_score, fr_score
+                ));
             }
 
             for layer in 0..6 {
@@ -235,6 +261,84 @@ impl WhisperEngine {
             .unwrap_or_else(|_| format!("[{} tokens]", ids.len()));
         Ok(text.trim().to_string())
     }
+}
+
+#[derive(Clone, Debug)]
+struct DecoderBias {
+    enabled: bool,
+    phrases: Vec<BiasedPhrase>,
+    first_token_bias: f32,
+    next_token_bias: f32,
+}
+
+#[derive(Clone, Debug)]
+struct BiasedPhrase {
+    tokens: Vec<i64>,
+    priority: BiasPriority,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BiasPriority {
+    Normal,
+    High,
+}
+
+impl DecoderBias {
+    fn disabled() -> Self {
+        let _ = BiasPriority::Normal;
+        Self {
+            enabled: false,
+            phrases: Vec::new(),
+            first_token_bias: 0.15,
+            next_token_bias: 0.45,
+        }
+    }
+
+    fn score(&self, token: i64, output_ids: &[i64]) -> f32 {
+        if !self.enabled {
+            return 0.0;
+        }
+        let mut bias = 0.0f32;
+        for phrase in &self.phrases {
+            if phrase.tokens.is_empty() {
+                continue;
+            }
+            if phrase.tokens[0] == token && phrase.priority == BiasPriority::High {
+                bias = bias.max(self.first_token_bias);
+            }
+            if let Some(next) = next_phrase_token(output_ids, &phrase.tokens) {
+                if next == token {
+                    bias = bias.max(self.next_token_bias);
+                }
+            }
+        }
+        bias
+    }
+}
+
+fn next_phrase_token(output_ids: &[i64], phrase: &[i64]) -> Option<i64> {
+    let max_prefix = phrase.len().saturating_sub(1).min(output_ids.len());
+    for prefix_len in (1..=max_prefix).rev() {
+        if output_ids.ends_with(&phrase[..prefix_len]) {
+            return phrase.get(prefix_len).copied();
+        }
+    }
+    None
+}
+
+fn prompt_tokens(language: Language) -> Vec<i64> {
+    match language {
+        Language::English => vec![SOT, LANG_EN, TRANSCRIBE, NOTIMESTAMPS],
+        Language::French => vec![SOT, LANG_FR, TRANSCRIBE, NOTIMESTAMPS],
+        Language::Auto => vec![SOT],
+    }
+}
+
+fn token_score(logits: &ndarray::ArrayViewD<f16>, token: i64) -> Option<f32> {
+    logits
+        .iter()
+        .nth(token as usize)
+        .map(|value| f32::from(*value))
 }
 
 fn resample_to_16k(samples: &[f32], sample_rate: u32) -> Vec<f32> {
@@ -278,4 +382,55 @@ fn make_qnn_ep(qnn_backend: &Path) -> ExecutionProviderDispatch {
         .with_performance_mode(QNNPerformanceMode::Burst)
         .build()
         .fail_silently()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_tokens_force_transcription_language() {
+        assert_eq!(
+            prompt_tokens(Language::English),
+            vec![SOT, LANG_EN, TRANSCRIBE, NOTIMESTAMPS]
+        );
+        assert_eq!(
+            prompt_tokens(Language::French),
+            vec![SOT, LANG_FR, TRANSCRIBE, NOTIMESTAMPS]
+        );
+        assert_eq!(prompt_tokens(Language::Auto), vec![SOT]);
+    }
+
+    #[test]
+    fn decoder_bias_only_continues_matching_phrase() {
+        let bias = DecoderBias {
+            enabled: true,
+            phrases: vec![BiasedPhrase {
+                tokens: vec![10, 11, 12],
+                priority: BiasPriority::Normal,
+            }],
+            first_token_bias: 0.15,
+            next_token_bias: 0.45,
+        };
+        assert_eq!(bias.score(11, &[SOT, 10]), 0.45);
+        assert_eq!(bias.score(12, &[SOT, 10, 11]), 0.45);
+        assert_eq!(bias.score(12, &[SOT, 99]), 0.0);
+    }
+
+    #[test]
+    fn high_priority_bias_gets_small_first_token_boost() {
+        let bias = DecoderBias {
+            enabled: true,
+            phrases: vec![BiasedPhrase {
+                tokens: vec![42, 43],
+                priority: BiasPriority::High,
+            }],
+            first_token_bias: 0.15,
+            next_token_bias: 0.45,
+        };
+        assert_eq!(
+            bias.score(42, &[SOT, LANG_EN, TRANSCRIBE, NOTIMESTAMPS]),
+            0.15
+        );
+    }
 }

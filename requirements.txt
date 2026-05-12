@@ -2,7 +2,7 @@
 # Install with: pip install -r requirements.txt
 # NOTE: use AMD x64 Python, not ARM64
 
-qai_hub_models[whisper_base_en]
+qai_hub_models[whisper_base]
 onnxruntime>=1.18.0
 sounddevice>=0.4.6
 keyboard>=0.13.5

@@ -38,7 +38,9 @@ impl AudioRecorder {
             return Ok(());
         }
         let host = cpal::default_host();
-        let device = host.default_input_device().context("no input device found")?;
+        let device = host
+            .default_input_device()
+            .context("no input device found")?;
         let default_config = device
             .default_input_config()
             .context("could not query default input config")?;
@@ -63,7 +65,13 @@ impl AudioRecorder {
                 candidate.format,
                 candidate.config.buffer_size
             ));
-            match build_stream(&device, candidate.format, &candidate.config, self.state.clone(), tx.clone()) {
+            match build_stream(
+                &device,
+                candidate.format,
+                &candidate.config,
+                self.state.clone(),
+                tx.clone(),
+            ) {
                 Ok(stream) => {
                     selected = Some((stream, candidate));
                     break;
@@ -86,7 +94,10 @@ impl AudioRecorder {
         })?;
 
         {
-            let mut guard = self.state.lock().map_err(|_| anyhow!("audio state poisoned"))?;
+            let mut guard = self
+                .state
+                .lock()
+                .map_err(|_| anyhow!("audio state poisoned"))?;
             guard.active = true;
             guard.sample_rate = selected_config.config.sample_rate.0;
             guard.channels = selected_config.config.channels as usize;
@@ -218,7 +229,9 @@ fn build_stream(
             move |data: &[f32], _| handle_input(data, &state, &tx),
             move |err| {
                 logger::line(format!("audio stream error: {err}"));
-                let _ = err_tx.send(AppEvent::TranscriptionError(format!("audio stream error: {err}")));
+                let _ = err_tx.send(AppEvent::TranscriptionError(format!(
+                    "audio stream error: {err}"
+                )));
             },
             None,
         )?,
@@ -227,7 +240,9 @@ fn build_stream(
             move |data: &[i16], _| handle_input(data, &state, &tx),
             move |err| {
                 logger::line(format!("audio stream error: {err}"));
-                let _ = err_tx.send(AppEvent::TranscriptionError(format!("audio stream error: {err}")));
+                let _ = err_tx.send(AppEvent::TranscriptionError(format!(
+                    "audio stream error: {err}"
+                )));
             },
             None,
         )?,
@@ -236,7 +251,9 @@ fn build_stream(
             move |data: &[u16], _| handle_input(data, &state, &tx),
             move |err| {
                 logger::line(format!("audio stream error: {err}"));
-                let _ = err_tx.send(AppEvent::TranscriptionError(format!("audio stream error: {err}")));
+                let _ = err_tx.send(AppEvent::TranscriptionError(format!(
+                    "audio stream error: {err}"
+                )));
             },
             None,
         )?,

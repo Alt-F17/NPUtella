@@ -2231,6 +2231,7 @@ dependencies = [
  "once_cell",
  "ort",
  "rustfft",
+ "strsim",
  "tokenizers",
  "windows 0.58.0",
 ]

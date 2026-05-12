@@ -2,7 +2,7 @@
 
 Local native Windows NPU-accelerated dictation for Snapdragon X Plus.
 Hold `Right Alt`, speak, release, and the recognized text is pasted into the focused app.
-Whisper-Base-En runs locally through ONNX Runtime's QNN Execution Provider. No cloud inference.
+Multilingual Whisper-Base runs locally through ONNX Runtime's QNN Execution Provider. No cloud inference.
 
 ## Setup
 
@@ -34,7 +34,7 @@ cd C:\Users\felix\Nextcloud\NPUtella
 python setup.py
 ```
 
-`setup.py` installs `requirements.txt`, exports Whisper-Base-En, and normalizes the runtime model layout to:
+`setup.py` installs `requirements.txt`, exports multilingual Whisper-Base, and normalizes the runtime model layout to:
 
 ```text
 models/
@@ -72,9 +72,55 @@ For the background launcher, `start_nputella.vbs` runs the native executable whe
 | Hold `Right Alt` | Starts recording and shows red audio bars |
 | Release `Right Alt` | Transcribes locally and pastes with `Ctrl+V` |
 | Click idle overlay | Toggles recording |
+| Hover and click `dict` | Opens the dictionary manager |
+| Hover and click `bi`/`fr`/`en` | Cycles transcription language |
 | Tap under 300 ms | Ignored to prevent accidental triggers |
 
 `f17.ahk` remaps `Right Alt` to `F17`, and the native app listens for `F17` through a low-level Windows keyboard hook.
+
+## Local Adaptation
+
+NPUtella applies local post-processing before paste:
+
+- language prompt selection supports `auto`, `en`, and `fr`
+- dictionary replacements and snippet expansion
+- spoken punctuation, new lines, and `press enter`
+- IDE/chat-aware filename and symbol tagging
+- basic code and math phrase formatting
+- custom dictionary entries persist to `%APPDATA%\NPUtella\dictionary.toml`
+
+To add dictionary entries, hover the idle pill and click `dict`, or use the NPUtella system tray menu.
+The dictionary manager edits custom written forms, comma-separated aliases, phonetic matching, priority, and language.
+
+Optional config is loaded from `nputella.toml` in the project root first, then `%APPDATA%\NPUtella\config.toml`.
+
+```toml
+language = "auto" # auto, en, fr; use fr or en to force one language while testing
+local_adaptation_enabled = false
+smart_formatting = true
+code_formatting = true
+math_formatting = true
+file_tagging = true
+symbol_tagging = true
+keep_transcript_on_clipboard = true
+local_llm_enabled = false
+local_llm_model = "phi-3.5-mini"
+local_llm_endpoint = "http://127.0.0.1:5273/v1/chat/completions"
+
+[[dictionary]]
+from = "n p u tella"
+written = "NPUtella"
+
+[[dictionary]]
+written = "NixOS"
+aliases = ["nix os", "nix o s", "nicsos", "nicks os"]
+phonetic = true
+priority = "high"
+
+[[snippet]]
+trigger = "code fence"
+expansion = "```\n\n```"
+```
 
 ## How It Works
 
