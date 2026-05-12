@@ -56,11 +56,13 @@ fn runtime_onnx_dir(root: &Path) -> PathBuf {
 
 fn is_project_root(dir: &Path) -> bool {
     dir.join("whisper-base-local").is_dir()
-        && dir.join("models")
+        && dir
+            .join("models")
             .join("whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core")
             .join("encoder.onnx")
             .is_file()
-        && dir.join("models")
+        && dir
+            .join("models")
             .join("whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core")
             .join("decoder.onnx")
             .is_file()
@@ -73,12 +75,11 @@ struct NputellaApp {
     recorder: AudioRecorder,
     state: OverlayState,
     recording_since: Option<Instant>,
-    current_size: egui::Vec2,
-    size_velocity: egui::Vec2,
     current_pos: egui::Pos2,
     screen_size: (f32, f32),
     last_frame: Instant,
     hover_t: f32,
+    morph_t: f32,
 }
 
 impl NputellaApp {
@@ -94,12 +95,11 @@ impl NputellaApp {
             recorder: AudioRecorder::new(),
             state: OverlayState::loading(),
             recording_since: None,
-            current_size: egui::vec2(ui::ACTIVE_W, ui::ACTIVE_H),
-            size_velocity: egui::Vec2::ZERO,
             current_pos: egui::pos2(0.0, 0.0),
             screen_size: (1920.0, 1080.0),
             last_frame: Instant::now(),
             hover_t: 0.0,
+            morph_t: 1.0,
         }
     }
 
@@ -185,7 +185,10 @@ impl NputellaApp {
 
             match result {
                 Ok(text) if !text.trim().is_empty() => {
-                    logger::line(format!("transcription complete: {} chars", text.chars().count()));
+                    logger::line(format!(
+                        "transcription complete: {} chars",
+                        text.chars().count()
+                    ));
                     let _ = system::copy_and_paste(&text);
                     let _ = tx.send(AppEvent::TranscriptionDone(text));
                 }
@@ -202,24 +205,9 @@ impl NputellaApp {
     }
 
     fn update_window_geometry(&mut self, ctx: &egui::Context, target_size: egui::Vec2) {
-        let now = Instant::now();
-        let dt = now
-            .duration_since(self.last_frame)
-            .as_secs_f32()
-            .clamp(1.0 / 240.0, 1.0 / 30.0);
-        self.last_frame = now;
-        self.current_size = spring_vec2(self.current_size, target_size, &mut self.size_velocity, dt);
-        let padded_size = egui::vec2(
-            target_size.x + ui::WINDOW_PAD * 2.0,
-            target_size.y + ui::WINDOW_PAD * 2.0,
-        );
         let actual_size = egui::vec2(
-            (self.current_size.x + ui::WINDOW_PAD * 2.0)
-                .round()
-                .max(padded_size.x),
-            (self.current_size.y + ui::WINDOW_PAD * 2.0)
-                .round()
-                .max(padded_size.y),
+            (target_size.x + ui::WINDOW_PAD * 2.0).round(),
+            (target_size.y + ui::WINDOW_PAD * 2.0).round(),
         );
         ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(actual_size));
         let screen_rect = ctx.input(|i| i.viewport().monitor_size);
@@ -243,6 +231,13 @@ impl App for NputellaApp {
 
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         apply_transparent_egui_style(ctx);
+        let now = Instant::now();
+        let dt = now
+            .duration_since(self.last_frame)
+            .as_secs_f32()
+            .clamp(1.0 / 240.0, 1.0 / 30.0);
+        self.last_frame = now;
+
         self.process_events();
 
         let pointer_hovered = ctx.input(|i| i.pointer.hover_pos().is_some());
@@ -252,11 +247,25 @@ impl App for NputellaApp {
         } else {
             0.0
         };
-        self.hover_t += (hover_target - self.hover_t) * 0.12;
+        self.hover_t = approach(self.hover_t, hover_target, 13.0, dt);
 
-        let target_size = self.state.target_size();
+        let morph_target = if self.state.phase == AppPhase::Idle {
+            0.0
+        } else {
+            1.0
+        };
+        let morph_speed = if morph_target > self.morph_t {
+            20.0
+        } else {
+            24.0
+        };
+        self.morph_t = approach(self.morph_t, morph_target, morph_speed, dt);
+
+        let target_size = egui::vec2(ui::ACTIVE_W, ui::ACTIVE_H);
         self.update_window_geometry(ctx, target_size);
-        if (self.hover_t - hover_target).abs() > 0.001 {
+        if (self.hover_t - hover_target).abs() > 0.001
+            || (self.morph_t - morph_target).abs() > 0.001
+        {
             ctx.request_repaint();
         } else {
             ctx.request_repaint_after(Duration::from_millis(16));
@@ -278,7 +287,7 @@ impl App for NputellaApp {
             }
         }
         self.state.hovered = response.hovered();
-        self.state.paint(ui, rect, self.hover_t);
+        self.state.paint(ui, rect, self.hover_t, self.morph_t);
     }
 }
 
@@ -295,20 +304,10 @@ fn apply_transparent_egui_style(ctx: &egui::Context) {
     ctx.set_global_style(style);
 }
 
-fn spring_vec2(
-    current: egui::Vec2,
-    target: egui::Vec2,
-    velocity: &mut egui::Vec2,
-    dt: f32,
-) -> egui::Vec2 {
-    let stiffness = 420.0;
-    let damping = 34.0;
-    let displacement = target - current;
-    let acceleration = displacement * stiffness - *velocity * damping;
-    *velocity += acceleration * dt;
-    let next = current + *velocity * dt;
-    if (target - next).length_sq() < 0.04 && velocity.length_sq() < 0.04 {
-        *velocity = egui::Vec2::ZERO;
+fn approach(current: f32, target: f32, speed: f32, dt: f32) -> f32 {
+    let t = 1.0 - (-speed * dt).exp();
+    let next = current + (target - current) * t;
+    if (target - next).abs() < 0.001 {
         target
     } else {
         next
@@ -394,7 +393,10 @@ fn main() -> Result<()> {
             .with_always_on_top()
             .with_taskbar(false)
             .with_resizable(false)
-            .with_inner_size([ui::ACTIVE_W + ui::WINDOW_PAD * 2.0, ui::ACTIVE_H + ui::WINDOW_PAD * 2.0])
+            .with_inner_size([
+                ui::ACTIVE_W + ui::WINDOW_PAD * 2.0,
+                ui::ACTIVE_H + ui::WINDOW_PAD * 2.0,
+            ])
             .with_title("nputella"),
         renderer: Renderer::Glow,
         ..Default::default()

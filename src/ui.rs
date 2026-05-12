@@ -127,40 +127,43 @@ impl OverlayState {
         self.collapse_at = None;
     }
 
-    pub fn target_size(&self) -> egui::Vec2 {
-        match self.phase {
-            AppPhase::Idle => egui::vec2(IDLE_W, IDLE_H),
-            _ => egui::vec2(ACTIVE_W, ACTIVE_H),
-        }
-    }
-
     fn schedule_collapse(&mut self) {
         self.collapse_at = Some(Instant::now() + Duration::from_millis(500));
     }
 
-    pub fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, hover_t: f32) {
+    pub fn paint(&self, ui: &mut egui::Ui, rect: egui::Rect, hover_t: f32, morph_t: f32) {
         let painter = ui.painter_at(rect);
         let available = rect.shrink(WINDOW_PAD);
-        let base_size = self.target_size();
-        let hover_size = if self.phase == AppPhase::Idle {
-            egui::vec2(base_size.x + 4.0 * hover_t, base_size.y + 2.0 * hover_t)
-        } else {
-            base_size
-        };
-        let rect = egui::Rect::from_center_size(available.center(), hover_size);
+        let shape_t = smoothstep(morph_t);
+        let width_t = ease_out_cubic(morph_t);
+        let hover_push = hover_t * (1.0 - shape_t);
+        let size = egui::vec2(
+            lerp(IDLE_W, ACTIVE_W, width_t) + 4.0 * hover_push,
+            lerp(IDLE_H, ACTIVE_H, shape_t) + 2.0 * hover_push,
+        );
+        let rect = egui::Rect::from_center_size(available.center(), size);
         let size = rect.size();
-        let progress = ((size.x - IDLE_W) / (ACTIVE_W - IDLE_W)).clamp(0.0, 1.0);
-        let bg = if progress > 0.1 {
-            egui::Color32::from_rgba_premultiplied(7, 7, 8, 238)
-        } else {
-            egui::Color32::from_rgba_premultiplied(12, 12, 12, 225)
-        };
+        let content_t = smoothstep(remap(morph_t, 0.18, 0.92));
+        let idle_t = 1.0 - smoothstep(remap(morph_t, 0.0, 0.45));
+        let bg = mix_color(
+            egui::Color32::from_rgba_premultiplied(12, 12, 12, 225),
+            egui::Color32::from_rgba_premultiplied(7, 7, 8, 238),
+            shape_t,
+        );
         let radius = size.y * 0.5;
         painter.rect(
             rect,
             radius,
             bg,
-            egui::Stroke::new(1.0, egui::Color32::from_rgba_premultiplied(255, 255, 255, 96)),
+            egui::Stroke::new(
+                1.0,
+                egui::Color32::from_rgba_premultiplied(
+                    255,
+                    255,
+                    255,
+                    lerp(70.0, 106.0, shape_t) as u8,
+                ),
+            ),
             egui::StrokeKind::Inside,
         );
         painter.line_segment(
@@ -168,19 +171,38 @@ impl OverlayState {
                 egui::pos2(rect.left() + radius * 0.75, rect.top() + 1.0),
                 egui::pos2(rect.right() - radius * 0.75, rect.top() + 1.0),
             ],
-            egui::Stroke::new(1.0, egui::Color32::from_rgba_premultiplied(255, 255, 255, 28)),
+            egui::Stroke::new(
+                1.0,
+                egui::Color32::from_rgba_premultiplied(
+                    255,
+                    255,
+                    255,
+                    lerp(18.0, 34.0, shape_t) as u8,
+                ),
+            ),
         );
 
         let center = rect.center();
-        if self.phase == AppPhase::Idle || progress < 0.15 {
-            painter.circle_filled(center, 3.5, egui::Color32::from_gray(78));
+        if idle_t > 0.01 {
+            painter.circle_filled(
+                center,
+                3.5,
+                with_alpha(egui::Color32::from_gray(78), idle_t),
+            );
+        }
+        if self.phase == AppPhase::Idle || content_t <= 0.01 {
             return;
         }
 
         match self.phase {
             AppPhase::Recording => {
-                paint_audio_bars(&painter, rect, self.audio_level, progress);
-                paint_status_dot(&painter, egui::pos2(rect.left() + 18.0, center.y), egui::Color32::from_rgb(255, 59, 48));
+                paint_audio_bars(&painter, rect, self.audio_level, content_t);
+                paint_status_dot(
+                    &painter,
+                    egui::pos2(lerp(center.x, rect.left() + 18.0, content_t), center.y),
+                    egui::Color32::from_rgb(255, 59, 48),
+                    content_t,
+                );
             }
             AppPhase::Transcribing => paint_spinner(&painter, rect),
             AppPhase::Done => paint_done(&painter, rect, &self.text),
@@ -221,7 +243,8 @@ fn paint_audio_bars(painter: &egui::Painter, rect: egui::Rect, level: f32, progr
             (255.0 * intensity) as u8,
             (59.0 * intensity * 0.6) as u8,
             (48.0 * intensity * 0.4) as u8,
-        );
+        )
+        .gamma_multiply(progress);
         painter.rect_filled(
             egui::Rect::from_min_max(egui::pos2(x, y1), egui::pos2(x + BAR_W, y2)),
             1.0,
@@ -245,7 +268,12 @@ fn paint_spinner(painter: &egui::Painter, rect: egui::Rect) {
 
 fn paint_done(painter: &egui::Painter, rect: egui::Rect, text: &str) {
     let center = rect.center();
-    paint_status_dot(painter, egui::pos2(rect.left() + 18.0, center.y), egui::Color32::from_rgb(48, 209, 88));
+    paint_status_dot(
+        painter,
+        egui::pos2(rect.left() + 18.0, center.y),
+        egui::Color32::from_rgb(48, 209, 88),
+        1.0,
+    );
     let short = if text.chars().count() > 16 {
         text.chars().take(16).collect::<String>() + "..."
     } else {
@@ -260,13 +288,13 @@ fn paint_done(painter: &egui::Painter, rect: egui::Rect, text: &str) {
     );
 }
 
-fn paint_status_dot(painter: &egui::Painter, pos: egui::Pos2, color: egui::Color32) {
-    painter.circle_filled(pos, 5.0, color.gamma_multiply(0.20));
-    painter.circle_filled(pos, 3.5, color);
+fn paint_status_dot(painter: &egui::Painter, pos: egui::Pos2, color: egui::Color32, alpha: f32) {
+    painter.circle_filled(pos, 5.0, color.gamma_multiply(0.20 * alpha));
+    painter.circle_filled(pos, 3.5, color.gamma_multiply(alpha));
     painter.circle_filled(
         egui::pos2(pos.x - 1.0, pos.y - 1.0),
         1.1,
-        egui::Color32::from_rgba_premultiplied(255, 255, 255, 110),
+        egui::Color32::from_rgba_premultiplied(255, 255, 255, (110.0 * alpha) as u8),
     );
 }
 
@@ -297,4 +325,36 @@ fn ui_time() -> f64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs_f64()
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t.clamp(0.0, 1.0)
+}
+
+fn remap(value: f32, from: f32, to: f32) -> f32 {
+    ((value - from) / (to - from)).clamp(0.0, 1.0)
+}
+
+fn smoothstep(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn ease_out_cubic(t: f32) -> f32 {
+    let t = 1.0 - t.clamp(0.0, 1.0);
+    1.0 - t * t * t
+}
+
+fn with_alpha(color: egui::Color32, alpha: f32) -> egui::Color32 {
+    color.gamma_multiply(alpha.clamp(0.0, 1.0))
+}
+
+fn mix_color(a: egui::Color32, b: egui::Color32, t: f32) -> egui::Color32 {
+    let t = t.clamp(0.0, 1.0);
+    egui::Color32::from_rgba_premultiplied(
+        lerp(a.r() as f32, b.r() as f32, t) as u8,
+        lerp(a.g() as f32, b.g() as f32, t) as u8,
+        lerp(a.b() as f32, b.b() as f32, t) as u8,
+        lerp(a.a() as f32, b.a() as f32, t) as u8,
+    )
 }
