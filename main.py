@@ -1,0 +1,98 @@
+"""
+whisprnpu - local NPU-accelerated dictation for Snapdragon X Plus.
+Hold Right Alt (remapped to F17 via AHK) to record.
+Release to transcribe and paste. Or click the pill to toggle.
+"""
+
+import sys
+import threading
+import time
+
+import keyboard
+import numpy as np
+import pyautogui
+import pyperclip
+
+from overlay import Overlay
+from transcriber import AudioRecorder, WhisperNPU
+
+HOLD_MIN_MS = 300
+
+
+class WhisperApp:
+    def __init__(self):
+        self.overlay = Overlay()
+        self.overlay.set_click_callback(self._on_overlay_click)
+        self.recorder = AudioRecorder()
+        self.whisper = WhisperNPU(status_callback=self._on_status)
+        self._held = False
+        self._hold_start = 0.0
+        self._transcribe_lock = threading.Lock()
+
+    def _on_overlay_click(self):
+        if self._held:
+            self._on_hotkey_up(None, skip_hold_check=True)
+        else:
+            self._on_hotkey_down(None)
+
+    def _on_status(self, status: str):
+        if status == "loading":
+            self.overlay.set_loading()
+        elif status == "ready":
+            self.overlay.set_done("NPU ready")
+        elif status == "models_missing":
+            self.overlay.set_error("models missing")
+            print("\n[whisprnpu] ONNX models not found.\nRun setup.py first.\n")
+        elif status.startswith("error:"):
+            self.overlay.set_error(status[6:30])
+            print(f"[whisprnpu] {status}")
+
+    def _on_hotkey_down(self, e):
+        if self._held:
+            return
+        if not self.whisper.is_ready():
+            self.overlay.set_error("model not ready")
+            return
+        self._held = True
+        self._hold_start = time.monotonic()
+        self.recorder.start(level_callback=self.overlay.push_level)
+        self.overlay.set_recording()
+
+    def _on_hotkey_up(self, e, skip_hold_check=False):
+        if not self._held:
+            return
+        self._held = False
+        elapsed_ms = (time.monotonic() - self._hold_start) * 1000
+        audio = self.recorder.stop()
+        if not skip_hold_check and elapsed_ms < HOLD_MIN_MS:
+            self.overlay._shrink_to_idle()
+            return
+        threading.Thread(target=self._transcribe_and_paste, args=(audio,), daemon=True).start()
+
+    def _transcribe_and_paste(self, audio: np.ndarray):
+        with self._transcribe_lock:
+            self.overlay.set_transcribing()
+            text = self.whisper.transcribe(audio)
+            if text:
+                pyperclip.copy(text)
+                time.sleep(0.05)
+                pyautogui.hotkey("ctrl", "v")
+                self.overlay.set_done(text)
+            else:
+                self.overlay.set_error("nothing heard")
+
+    def run(self):
+        print("[whisprnpu] starting - hold Right Alt (remapped to F17) to dictate")
+        keyboard.on_press_key("f17", self._on_hotkey_down, suppress=True)
+        keyboard.on_release_key("f17", self._on_hotkey_up, suppress=True)
+        try:
+            keyboard.wait()
+        except KeyboardInterrupt:
+            print("\n[whisprnpu] exiting")
+            self.overlay.destroy()
+            sys.exit(0)
+
+
+if __name__ == "__main__":
+    app = WhisperApp()
+    app.run()

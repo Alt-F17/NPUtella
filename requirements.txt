@@ -1,0 +1,15 @@
+# whisprnpu requirements
+# Install with: pip install -r requirements.txt
+# NOTE: use AMD x64 Python, not ARM64
+
+qai_hub_models[whisper_base_en]
+onnxruntime>=1.18.0
+sounddevice>=0.4.6
+keyboard>=0.13.5
+pyautogui>=0.9.54
+pyperclip>=1.8.2
+librosa>=0.10.0
+tiktoken>=0.6.0
+transformers>=4.40.0
+pynput>=1.7.6
+numpy>=1.24.0
