@@ -1,4 +1,4 @@
-# whisprnpu
+# NPUtella, Local NPU WisprFlow
 
 Local native Windows NPU-accelerated dictation for Snapdragon X Plus.
 Hold `Right Alt`, speak, release, and the recognized text is pasted into the focused app.
