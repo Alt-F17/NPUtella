@@ -152,6 +152,9 @@ impl NputellaApp {
                 AppEvent::OpenDictionaryManager => {
                     self.show_dictionary_manager = true;
                     self.dictionary_manager.ensure_loaded(&self.dictionary);
+                    self.dictionary_manager.request_focus();
+                    logger::line("dictionary manager open requested");
+                    ctx.request_repaint();
                 }
                 AppEvent::Quit => {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -307,6 +310,7 @@ impl App for NputellaApp {
         let pill_rect = OverlayState::pill_rect(bounds, self.hover_t, self.morph_t);
         let language_rect = OverlayState::language_rect(bounds, self.hover_t, self.morph_t);
         let dictionary_rect = OverlayState::dictionary_rect(bounds, self.hover_t, self.morph_t);
+        let hover_bridge_rect = OverlayState::hover_bridge_rect(bounds, self.hover_t, self.morph_t);
         let pointer_hovered = ctx.input(|i| {
             i.pointer
                 .hover_pos()
@@ -314,6 +318,9 @@ impl App for NputellaApp {
                     pill_rect.contains(pos)
                         || language_rect.contains(pos)
                         || dictionary_rect.contains(pos)
+                        || hover_bridge_rect
+                            .map(|rect| rect.contains(pos))
+                            .unwrap_or(false)
                 })
                 .unwrap_or(false)
         });
@@ -360,12 +367,16 @@ impl App for NputellaApp {
         let pill_rect = OverlayState::pill_rect(rect, self.hover_t, self.morph_t);
         let language_rect = OverlayState::language_rect(rect, self.hover_t, self.morph_t);
         let dictionary_rect = OverlayState::dictionary_rect(rect, self.hover_t, self.morph_t);
+        let hover_bridge_response =
+            OverlayState::hover_bridge_rect(rect, self.hover_t, self.morph_t)
+                .map(|rect| ui.allocate_rect(rect, egui::Sense::hover()));
         let dictionary_response = ui.allocate_rect(dictionary_rect, egui::Sense::click());
         let language_response = ui.allocate_rect(language_rect, egui::Sense::click());
         let pill_response = ui.allocate_rect(pill_rect, egui::Sense::click());
         if dictionary_response.clicked() && self.state.phase == AppPhase::Idle {
             self.show_dictionary_manager = true;
             self.dictionary_manager.ensure_loaded(&self.dictionary);
+            self.dictionary_manager.request_focus();
             logger::line("dictionary manager opened from overlay");
         } else if language_response.clicked() && self.state.phase == AppPhase::Idle {
             self.language = self.language.cycle();
@@ -377,8 +388,13 @@ impl App for NputellaApp {
                 self.start_recording();
             }
         }
-        self.state.hovered =
-            pill_response.hovered() || language_response.hovered() || dictionary_response.hovered();
+        self.state.hovered = pill_response.hovered()
+            || language_response.hovered()
+            || dictionary_response.hovered()
+            || hover_bridge_response
+                .as_ref()
+                .map(|response| response.hovered())
+                .unwrap_or(false);
         self.state
             .paint(ui, rect, self.hover_t, self.morph_t, self.language);
 
@@ -532,6 +548,7 @@ fn main() -> Result<()> {
         native_options,
         Box::new(move |cc| {
             apply_transparent_egui_style(&cc.egui_ctx);
+            tray::register_ui_context(cc.egui_ctx.clone());
             Ok(Box::new(NputellaApp::new(
                 tx_for_app.clone(),
                 rx,

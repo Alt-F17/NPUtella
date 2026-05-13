@@ -3,6 +3,8 @@ use crate::dictionary_store::DictionaryStore;
 use eframe::egui;
 use std::sync::Arc;
 
+const MANAGER_VIEWPORT_ID: &str = "nputella_dictionary_manager";
+
 #[derive(Clone)]
 struct EditableEntry {
     written: String,
@@ -18,6 +20,7 @@ pub struct DictionaryManager {
     loaded: bool,
     dirty: bool,
     status: String,
+    focus_requested: bool,
 }
 
 impl DictionaryManager {
@@ -28,7 +31,12 @@ impl DictionaryManager {
             loaded: false,
             dirty: false,
             status: String::new(),
+            focus_requested: false,
         }
+    }
+
+    pub fn request_focus(&mut self) {
+        self.focus_requested = true;
     }
 
     pub fn ensure_loaded(&mut self, store: &DictionaryStore) {
@@ -53,8 +61,9 @@ impl DictionaryManager {
     pub fn show(&mut self, ctx: &egui::Context, open: &mut bool, store: Arc<DictionaryStore>) {
         self.ensure_loaded(&store);
         let mut close_requested = false;
+        let viewport_id = egui::ViewportId::from_hash_of(MANAGER_VIEWPORT_ID);
         ctx.show_viewport_immediate(
-            egui::ViewportId::from_hash_of("nputella_dictionary_manager"),
+            viewport_id,
             egui::ViewportBuilder::default()
                 .with_title("NPUtella Dictionary")
                 .with_inner_size([620.0, 430.0])
@@ -72,6 +81,10 @@ impl DictionaryManager {
                 });
             },
         );
+        if self.focus_requested {
+            ctx.send_viewport_cmd_to(viewport_id, egui::ViewportCommand::Focus);
+            self.focus_requested = false;
+        }
         if close_requested {
             *open = false;
         }

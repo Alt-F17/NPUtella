@@ -170,6 +170,22 @@ impl OverlayState {
         )
     }
 
+    pub fn hover_bridge_rect(bounds: egui::Rect, hover_t: f32, morph_t: f32) -> Option<egui::Rect> {
+        if hover_t <= 0.01 || morph_t >= 0.98 {
+            return None;
+        }
+        let pill = Self::pill_rect(bounds, hover_t, morph_t);
+        let language = Self::language_rect(bounds, hover_t, morph_t);
+        let dictionary = Self::dictionary_rect(bounds, hover_t, morph_t);
+        Some(
+            egui::Rect::from_min_max(
+                egui::pos2(dictionary.left(), pill.top().min(dictionary.top())),
+                egui::pos2(language.right(), pill.bottom().max(language.bottom())),
+            )
+            .expand(2.0),
+        )
+    }
+
     pub fn paint(
         &self,
         ui: &mut egui::Ui,
