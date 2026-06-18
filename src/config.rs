@@ -326,10 +326,16 @@ fn parse_list(value: &str) -> Vec<String> {
 }
 
 pub fn default_dictionary() -> Vec<DictionaryEntry> {
-    vec![
-        DictionaryEntry::new("n p u tella", "NPUtella"),
-        DictionaryEntry::new("npu tella", "NPUtella"),
-    ]
+    let mut entry = DictionaryEntry::new("nputella", "NPUtella");
+    entry.aliases = vec![
+        "n p u tella".to_string(),
+        "npu tella".to_string(),
+        "en p you tella".to_string(),
+        "n p you tella".to_string(),
+    ];
+    entry.phonetic = true;
+    entry.priority = DictionaryPriority::High;
+    vec![entry]
 }
 
 pub fn default_snippets() -> Vec<Snippet> {

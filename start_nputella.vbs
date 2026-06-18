@@ -2,11 +2,8 @@ Set WshShell = CreateObject("WScript.Shell")
 Set Fso = CreateObject("Scripting.FileSystemObject")
 
 ScriptDir = Fso.GetParentFolderName(WScript.ScriptFullName)
-ProjectDir = "C:\Users\felix\Nextcloud\NPUtella"
-If Not Fso.FolderExists(ProjectDir) Then
-  ProjectDir = ScriptDir
-End If
-NativeExe = ProjectDir & "\target\release\nputella.exe"
+ProjectDir = ScriptDir
+NativeExe = ProjectDir & "\nputella.exe"
 LogPath = ProjectDir & "\nputella_launcher.log"
 
 Sub LogLine(Message)

@@ -9,6 +9,7 @@ Requires:
 """
 
 import platform
+import os
 import shutil
 import struct
 import subprocess
@@ -36,6 +37,15 @@ def install_deps():
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
     )
+
+
+def configure_qai_hub_from_env():
+    token = os.environ.get("QAI_HUB_API_TOKEN", "").strip()
+    if not token:
+        return
+
+    print("Configuring Qualcomm AI Hub from QAI_HUB_API_TOKEN...")
+    subprocess.check_call(["qai-hub", "configure", "--api_token", token])
 
 
 def _copy_if_different(src: Path, dst: Path):
@@ -88,13 +98,18 @@ def export_models():
     print("This compiles on Qualcomm AI Hub cloud and downloads optimized ONNX.")
     print("Takes roughly 5-10 minutes on first run.\n")
 
+    env = {
+        **dict(os.environ),
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+    }
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             EXPORT_MODULE,
             "--target-runtime",
-            "onnx",
+            "precompiled_qnn_onnx",
             "--device",
             DEVICE,
             "--output-dir",
@@ -102,6 +117,7 @@ def export_models():
             "--skip-profiling",
         ],
         capture_output=False,
+        env=env,
     )
 
     if result.returncode != 0:
@@ -118,5 +134,6 @@ def export_models():
 if __name__ == "__main__":
     check_python_arch()
     install_deps()
+    configure_qai_hub_from_env()
     if not export_models():
         sys.exit(1)

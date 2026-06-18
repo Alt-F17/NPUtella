@@ -1,4 +1,5 @@
 target/
+dist/
 venv*/
 __pycache__/
 *.py[cod]
@@ -9,6 +10,7 @@ __pycache__/
 *.wav
 
 models/
+release-assets/
 
 .env
 .env.*

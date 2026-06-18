@@ -1,10 +1,30 @@
 # NPUtella, Local NPU Whisper STT
 
 Local native Windows NPU-accelerated dictation for Snapdragon X Plus.
-Hold `Right Alt`, speak, release, and the recognized text is pasted into the focused app.
+Hold `Ctrl`, then `Win`, speak, release, and the recognized text is pasted into the focused app.
 Multilingual Whisper-Base runs locally through ONNX Runtime's QNN Execution Provider. No cloud inference.
 
 ## Setup
+
+## Download Release
+
+GitHub releases ship one independent MSI installer:
+
+```text
+NPUtella-<version>-SnapdragonXPlus-NPU.msi
+```
+
+This release is for Snapdragon X Plus Windows ARM64 NPU devices. It bundles:
+
+- native `nputella.exe`
+- Start Menu shortcut
+- English, French, and bilingual EN/FR Whisper model artifacts
+- Whisper tokenizer files
+- ONNX Runtime QNN DLLs
+
+More languages are planned for later releases.
+
+## Developer Setup
 
 ### 1. Python version for setup
 
@@ -30,11 +50,11 @@ The Hub compiles the model for the target Qualcomm device and downloads the ONNX
 ### 3. Install and export
 
 ```powershell
-cd C:\Users\felix\Nextcloud\NPUtella
+cd C:\path\to\NPUtella
 python setup.py
 ```
 
-`setup.py` installs `requirements.txt`, exports multilingual Whisper-Base, and normalizes the runtime model layout to:
+`setup.py` installs `requirements.txt`, exports multilingual Whisper-Base for developer builds, and normalizes the runtime model layout to:
 
 ```text
 models/
@@ -46,48 +66,52 @@ models/
 ### 4. Build the native app
 
 ```powershell
-cargo build --release
+cargo build --release --target aarch64-pc-windows-msvc
 ```
 
 The native executable is:
 
 ```text
-target\release\nputella.exe
+target\aarch64-pc-windows-msvc\release\nputella.exe
 ```
 
-The Rust ONNX Runtime binding currently expects an ONNX Runtime 1.22.x DLL. The older DLL inside the Python `venv-arm64` may be 1.17.x and is not compatible with the native app. If the overlay starts but shows a model runtime error, install or place a matching ONNX Runtime/QNN 1.22.x runtime on `PATH` or beside `nputella.exe`.
+The packaged release includes the matching ARM64 ONNX Runtime/QNN DLLs, model files, and tokenizer assets. No Python or Qualcomm AI Hub token is needed by end users.
 
 ### 5. Run
 
 ```powershell
-target\release\nputella.exe
+target\aarch64-pc-windows-msvc\release\nputella.exe
 ```
 
-For the background launcher, `start_nputella.vbs` runs the native executable when it exists and falls back to the old Python runtime otherwise.
+For the background launcher, `start_nputella.vbs` runs the packaged native executable beside it.
 
 ## Usage
 
 | Action | Result |
 |---|---|
-| Hold `Right Alt` | Starts recording and shows red audio bars |
-| Release `Right Alt` | Transcribes locally and pastes with `Ctrl+V` |
+| Hold `Ctrl`, then `Win` | Starts recording and shows red audio bars |
+| Release `Ctrl+Win` | Transcribes locally and pastes with `Ctrl+V` |
 | Click idle overlay | Toggles recording |
 | Hover and click `dict` | Opens the dictionary manager |
 | Hover and click `bi`/`fr`/`en` | Cycles transcription language |
 | Tap under 300 ms | Ignored to prevent accidental triggers |
 
-`f17.ahk` remaps `Right Alt` to `F17`, and the native app listens for `F17` through a low-level Windows keyboard hook.
+The native app listens for `Ctrl+Win` directly. Press `Ctrl` first, then `Win`; pressing `Win` first is passed through to Windows.
 
 ## Local Adaptation
 
 NPUtella applies local post-processing before paste:
 
-- language prompt selection supports `auto`, `en`, and `fr`
+- language prompt selection supports `bi`, `en`, and `fr`
 - dictionary replacements and snippet expansion
 - spoken punctuation, new lines, and `press enter`
 - IDE/chat-aware filename and symbol tagging
 - basic code and math phrase formatting
 - custom dictionary entries persist to `%APPDATA%\NPUtella\dictionary.toml`
+
+The shipped dictionary contains one phonetic starter entry:
+
+- `NPUtella` with aliases for common spoken forms of the brand name
 
 To add dictionary entries, hover the idle pill and click `dict`, or use the NPUtella system tray menu.
 The dictionary manager edits custom written forms, comma-separated aliases, phonetic matching, priority, and language.
@@ -95,7 +119,7 @@ The dictionary manager edits custom written forms, comma-separated aliases, phon
 Optional config is loaded from `nputella.toml` in the project root first, then `%APPDATA%\NPUtella\config.toml`.
 
 ```toml
-language = "auto" # auto, en, fr; use fr or en to force one language while testing
+language = "auto" # auto, bi, en, fr; use fr or en to force one language while testing
 local_adaptation_enabled = false
 smart_formatting = true
 code_formatting = true
@@ -111,12 +135,6 @@ local_llm_endpoint = "http://127.0.0.1:5273/v1/chat/completions"
 from = "n p u tella"
 written = "NPUtella"
 
-[[dictionary]]
-written = "NixOS"
-aliases = ["nix os", "nix o s", "nicsos", "nicks os"]
-phonetic = true
-priority = "high"
-
 [[snippet]]
 trigger = "code fence"
 expansion = "```\n\n```"
@@ -125,9 +143,9 @@ expansion = "```\n\n```"
 ## How It Works
 
 ```text
-F17 down
+Ctrl+Win down
   -> native cpal recorder captures mono audio
-F17 up
+Ctrl+Win up
   -> audio -> native Whisper log-mel features [1, 80, 3000]
   -> encoder.onnx through ONNX Runtime/QNN -> cross-attention KV cache
   -> decoder.onnx through ONNX Runtime/QNN -> greedy token decode
@@ -143,23 +161,43 @@ CPU fallback is used if QNN EP fails to initialize.
 ```text
 Cargo.toml       native Rust app manifest
 src/             native Windows app source
+installer/       WiX MSI installer definition
+scripts/         release packaging and publish scripts
 main.py          legacy Python entry point
 transcriber.py   legacy Python audio/inference implementation
 overlay.py       legacy Tkinter overlay
 setup.py         dependency install and Qualcomm AI Hub export
 requirements.txt Python dependencies
-f17.ahk          Right Alt -> F17 remap
+f17.ahk          optional legacy F17 remap for development
 keytest.py       diagnostic key listener
-start_nputella.vbs hidden launcher for native exe with Python fallback
+start_nputella.vbs hidden launcher for packaged native exe
 whisper-base-local/ local tokenizer and feature extractor config
 models/          compiled ONNX model artifacts
+```
+
+## Packaging
+
+Run this from a Snapdragon X Plus Windows ARM64 development machine with Rust plus either WiX Toolset v4 on `PATH` or the WiX v4 .NET tool available. Release packaging also requires `NPUTELLA_RELEASE_ASSET_ROOT` to point at a prebuilt ARM64 asset bundle:
+
+```powershell
+.\scripts\build-installer.ps1
+```
+
+The `Cargo.toml` version must be an MSI-safe numeric `major.minor.patch` value, for example `2.0.0`.
+
+The script builds `target\aarch64-pc-windows-msvc\release\nputella.exe`, stages the app, model, tokenizer, and ARM64 QNN runtime files, runs `nputella.exe --self-check`, writes release metadata/checksums, then writes the standalone MSI to `dist\`.
+
+To publish with the GitHub CLI:
+
+```powershell
+.\scripts\publish-release.ps1
 ```
 
 ## Troubleshooting
 
 `models missing`: run `python setup.py` and confirm `encoder.onnx` and `decoder.onnx` exist in the nested runtime model directory.
 
-`QNN EP not active`: check that `QnnHtp.dll` is on `PATH`. It usually ships with onnxruntime-qnn or the Qualcomm AI Runtime SDK.
+`QNN EP not active`: confirm the release payload contains `runtime\onnxruntime\capi\QnnHtp.dll` and the other bundled ONNX Runtime/QNN DLLs.
 
 Paste does not work in some apps: some apps block synthetic input. The transcript is still copied to the clipboard.
 
@@ -169,7 +207,7 @@ Export fails with device not found: edit `DEVICE` in `setup.py` or run `qai-hub 
 
 The native Rust rewrite implements these subsystems:
 
-- Global F17 press/release listener with optional suppression.
+- Global Ctrl+Win press/release listener with internal F17 compatibility for development.
 - 16 kHz mono microphone capture with block-level RMS levels.
 - Whisper-compatible log-mel preprocessing.
 - ONNX Runtime sessions with QNN provider options and CPU fallback.

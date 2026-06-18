@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use std::{fs::File, io::Read};
 use ui::{AppEvent, AppPhase, OverlayState, SCREEN_BOTTOM_OFFSET};
 use whisper::WhisperEngine;
 
@@ -36,12 +37,12 @@ const HOLD_MIN_MS: u64 = 300;
 
 fn app_root() -> Result<PathBuf> {
     let mut starts = Vec::new();
-    if let Ok(cwd) = std::env::current_dir() {
-        starts.push(cwd);
-    }
     let exe = std::env::current_exe().context("current_exe failed")?;
     if let Some(parent) = exe.parent() {
         starts.push(parent.to_path_buf());
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        starts.push(cwd);
     }
 
     for start in starts {
@@ -59,6 +60,11 @@ fn app_root() -> Result<PathBuf> {
 }
 
 fn runtime_onnx_dir(root: &Path) -> PathBuf {
+    let bundled = root.join("runtime").join("onnxruntime").join("capi");
+    if bundled.join("onnxruntime.dll").is_file() {
+        return bundled;
+    }
+
     root.join("venv-arm64")
         .join("Lib")
         .join("site-packages")
@@ -92,6 +98,8 @@ struct NputellaApp {
     show_dictionary_manager: bool,
     recorder: AudioRecorder,
     state: OverlayState,
+    hotkey_down: bool,
+    pending_recording: bool,
     recording_since: Option<Instant>,
     current_pos: egui::Pos2,
     screen_size: (f32, f32),
@@ -122,6 +130,8 @@ impl NputellaApp {
             show_dictionary_manager: false,
             recorder: AudioRecorder::new(),
             state: OverlayState::loading(),
+            hotkey_down: false,
+            pending_recording: false,
             recording_since: None,
             current_pos: egui::pos2(0.0, 0.0),
             screen_size: (1920.0, 1080.0),
@@ -137,9 +147,23 @@ impl NputellaApp {
             match event {
                 AppEvent::EngineStatus(status) => {
                     self.state.set_engine_status(status);
+                    if self.pending_recording
+                        && self.hotkey_down
+                        && matches!(self.state.engine_status, ui::EngineStatus::Ready)
+                    {
+                        self.pending_recording = false;
+                        self.start_recording();
+                    }
                 }
-                AppEvent::HotkeyDown => self.start_recording(),
-                AppEvent::HotkeyUp => self.stop_recording(),
+                AppEvent::HotkeyDown => {
+                    self.hotkey_down = true;
+                    self.start_recording();
+                }
+                AppEvent::HotkeyUp => {
+                    self.hotkey_down = false;
+                    self.pending_recording = false;
+                    self.stop_recording();
+                }
                 AppEvent::AudioLevel(level) => self.state.audio_level = level,
                 AppEvent::TranscriptionDone(text) => {
                     self.state.finish_done(text);
@@ -174,9 +198,15 @@ impl NputellaApp {
             .and_then(|guard| guard.as_ref().cloned())
             .is_some();
         if !ready {
-            self.state.finish_error("model not ready".to_string());
+            if matches!(self.state.engine_status, ui::EngineStatus::Loading) {
+                self.pending_recording = true;
+                logger::line("record request queued until model is ready");
+            } else {
+                self.state.finish_error("model not ready".to_string());
+            }
             return;
         }
+        self.pending_recording = false;
         let level_tx = self.tx.clone();
         match self.recorder.start(level_tx) {
             Ok(()) => {
@@ -433,6 +463,9 @@ fn approach(current: f32, target: f32, speed: f32, dt: f32) -> f32 {
 
 fn main() -> Result<()> {
     let root = app_root()?;
+    if std::env::args().any(|arg| arg == "--self-check") {
+        return run_self_check(&root);
+    }
     logger::init(&root);
     logger::line(format!("starting nputella from root {}", root.display()));
     let _single_instance = match single_instance::SingleInstance::acquire() {
@@ -449,12 +482,12 @@ fn main() -> Result<()> {
     let onnx_dir = runtime_onnx_dir(&root);
     if onnx_dir.exists() {
         logger::line(format!(
-            "found Python ONNX Runtime directory {}; not prepending to PATH",
+            "found bundled ONNX Runtime directory {}; runtime loader will use it",
             onnx_dir.display()
         ));
     } else {
         logger::line(format!(
-            "Python ONNX Runtime directory not found at {}",
+            "bundled ONNX Runtime directory not found at {}",
             onnx_dir.display()
         ));
     }
@@ -562,4 +595,91 @@ fn main() -> Result<()> {
     .map_err(|err| anyhow::anyhow!("running egui app: {err}"))?;
 
     Ok(())
+}
+
+fn run_self_check(root: &Path) -> Result<()> {
+    let runtime = runtime_onnx_dir(root);
+    let model_dir = root
+        .join("models")
+        .join("whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core");
+    let required = [
+        root.join("whisper-base-local").join("vocab.json"),
+        root.join("whisper-base-local").join("merges.txt"),
+        model_dir.join("encoder.onnx"),
+        model_dir.join("decoder.onnx"),
+        model_dir.join("encoder_qairt_context.bin"),
+        model_dir.join("decoder_qairt_context.bin"),
+        runtime.join("onnxruntime.dll"),
+        runtime.join("onnxruntime_providers_qnn.dll"),
+        runtime.join("onnxruntime_providers_shared.dll"),
+        runtime.join("QnnHtp.dll"),
+        runtime.join("QnnHtpPrepare.dll"),
+        runtime.join("QnnSystem.dll"),
+    ];
+
+    let mut missing = Vec::new();
+    for path in required {
+        if !path.is_file() {
+            missing.push(path);
+        }
+    }
+    if !missing.is_empty() {
+        for path in missing {
+            eprintln!("missing {}", path.display());
+        }
+        anyhow::bail!("self-check failed: required release files are missing");
+    }
+
+    const IMAGE_FILE_MACHINE_ARM64: u16 = 0xAA64;
+    for dll in
+        std::fs::read_dir(&runtime).with_context(|| format!("reading {}", runtime.display()))?
+    {
+        let dll = dll?;
+        let path = dll.path();
+        if path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("dll"))
+            .unwrap_or(false)
+        {
+            let arch = pe_machine(&path)?;
+            if arch != IMAGE_FILE_MACHINE_ARM64 {
+                anyhow::bail!(
+                    "self-check failed: runtime DLL architecture mismatch ({}={:#x})",
+                    path.display(),
+                    arch
+                );
+            }
+        }
+    }
+
+    println!("NPUtella self-check OK");
+    println!("root={}", root.display());
+    println!("runtime={}", runtime.display());
+    println!("languages=en,fr,bi");
+    println!("device=Snapdragon X Plus NPU Windows ARM64");
+    Ok(())
+}
+
+fn pe_machine(path: &Path) -> Result<u16> {
+    let mut file = File::open(path).with_context(|| format!("opening {}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .with_context(|| format!("reading {}", path.display()))?;
+    if bytes.len() < 0x40 {
+        anyhow::bail!("{} is too small to be a PE file", path.display());
+    }
+    if &bytes[0..2] != b"MZ" {
+        anyhow::bail!("{} is not a PE file", path.display());
+    }
+    let pe_offset = u32::from_le_bytes(bytes[0x3C..0x40].try_into().unwrap()) as usize;
+    if bytes.len() < pe_offset + 6 {
+        anyhow::bail!("{} is missing PE headers", path.display());
+    }
+    if &bytes[pe_offset..pe_offset + 4] != b"PE\0\0" {
+        anyhow::bail!("{} has an invalid PE signature", path.display());
+    }
+    Ok(u16::from_le_bytes(
+        bytes[pe_offset + 4..pe_offset + 6].try_into().unwrap(),
+    ))
 }

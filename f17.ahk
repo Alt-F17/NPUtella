@@ -1,3 +1,3 @@
 ﻿#Requires AutoHotkey v2.0
-; Remap Right Alt to F17 (no physical key, rarely intercepted)
-RAlt::F17
+; Development-only remap for testing the legacy F17 hook path.
+F24::F17
