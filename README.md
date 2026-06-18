@@ -4,14 +4,18 @@ Local native Windows NPU-accelerated dictation for Snapdragon X Plus.
 Hold `Ctrl`, then `Win`, speak, release, and the recognized text is pasted into the focused app.
 Multilingual Whisper-Base runs locally through ONNX Runtime's QNN Execution Provider. No cloud inference.
 
-## Setup
-
 ## Download Release
 
 GitHub releases ship one independent MSI installer:
 
 ```text
 NPUtella-<version>-SnapdragonXPlus-NPU.msi
+```
+
+Download it from the GitHub Releases page, then double-click the MSI to install. The installer is per-user and installs under:
+
+```text
+%LOCALAPPDATA%\Programs\NPUtella
 ```
 
 This release is for Snapdragon X Plus Windows ARM64 NPU devices. It bundles:
@@ -23,6 +27,8 @@ This release is for Snapdragon X Plus Windows ARM64 NPU devices. It bundles:
 - ONNX Runtime QNN DLLs
 
 More languages are planned for later releases.
+
+No Python, Rust, Qualcomm AI Hub token, WiX, or model download is required on end-user machines.
 
 ## Developer Setup
 
@@ -116,10 +122,10 @@ The shipped dictionary contains one phonetic starter entry:
 To add dictionary entries, hover the idle pill and click `dict`, or use the NPUtella system tray menu.
 The dictionary manager edits custom written forms, comma-separated aliases, phonetic matching, priority, and language.
 
-Optional config is loaded from `nputella.toml` in the project root first, then `%APPDATA%\NPUtella\config.toml`.
+Optional config is loaded from `nputella.toml` in the app root first, then `%APPDATA%\NPUtella\config.toml`.
 
 ```toml
-language = "auto" # auto, bi, en, fr; use fr or en to force one language while testing
+language = "auto" # auto/bi, en, fr; use fr or en to force one language while testing
 local_adaptation_enabled = false
 smart_formatting = true
 code_formatting = true
@@ -179,7 +185,29 @@ models/          compiled ONNX model artifacts
 
 Run this from a Snapdragon X Plus Windows ARM64 development machine with Rust plus either WiX Toolset v4 on `PATH` or the WiX v4 .NET tool available. Release packaging also requires `NPUTELLA_RELEASE_ASSET_ROOT` to point at a prebuilt ARM64 asset bundle:
 
+```text
+<asset-root>/
+  runtime/onnxruntime/capi/
+    onnxruntime.dll
+    onnxruntime_providers_qnn.dll
+    onnxruntime_providers_shared.dll
+    QnnHtp.dll
+    QnnHtpPrepare.dll
+    QnnSystem.dll
+  models/whisper_base-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_plus_8_core/
+    encoder.onnx
+    decoder.onnx
+    encoder_qairt_context.bin
+    decoder_qairt_context.bin
+  whisper-base-local/
+    vocab.json
+    merges.txt
+```
+
+Set the asset root and build:
+
 ```powershell
+$env:NPUTELLA_RELEASE_ASSET_ROOT = "C:\path\to\asset-root"
 .\scripts\build-installer.ps1
 ```
 
