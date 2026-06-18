@@ -20,7 +20,7 @@ export function Section({ id, className = '', children }: SectionProps) {
           observer.disconnect()
         }
       },
-      { threshold: 0.15 },
+      { threshold: 0.08, rootMargin: '0px 0px -8% 0px' },
     )
     observer.observe(el)
     return () => observer.disconnect()

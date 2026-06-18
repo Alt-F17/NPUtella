@@ -56,14 +56,16 @@ export default function App() {
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-black">
       <AppBackground />
       <Header />
-      <main className="flex flex-1 flex-col">
+      <main className="relative z-10 flex flex-1 flex-col">
         <Hero />
         <Features />
         <ShowcaseSection />
         <HowItWorks />
         <DownloadCTA />
       </main>
-      <Footer />
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   )
 }
