@@ -95,7 +95,7 @@ export function PillWidget({
       />
 
       <div
-        className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border transition-all duration-300 ease-snap"
+        className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border transition-[width,height,border-color,background-color,transform] duration-200 ease-snap"
         style={{
           width: size.w,
           height: size.h,
@@ -111,7 +111,7 @@ export function PillWidget({
 
         {phase === 'recording' && (
           <div key="recording" className="flex items-center gap-[6px] animate-fade-in" aria-hidden="true">
-            <StatusDot color="#FF3B30" />
+            <StatusDot color="#ff453a" />
             <AudioBars active />
           </div>
         )}
@@ -124,7 +124,7 @@ export function PillWidget({
 
         {phase === 'done' && (
           <div key="done" className="flex items-center gap-2 px-3 animate-fade-in" aria-hidden="true">
-            <StatusDot color="#30D158" />
+            <StatusDot color="#32d74b" />
             <span className="truncate text-[9px] text-white">{truncate(resultText, 16) || 'ready'}</span>
           </div>
         )}
@@ -157,7 +157,7 @@ export function PillWidget({
 
 function Spinner() {
   return (
-    <div className="absolute inset-0 animate-orbit">
+    <div className="absolute inset-0">
       {SPINNER_DOTS.map(([x, y], i) => (
         <span
           key={i}

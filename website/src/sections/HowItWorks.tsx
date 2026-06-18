@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 import { Section } from '../components/ui/Section'
 
 const USAGE_ROWS: { action: ReactNode; result: ReactNode }[] = [
-  { action: <>Hold <Kbd>Right Alt</Kbd></>, result: 'Starts recording and shows red audio bars' },
-  { action: <>Release <Kbd>Right Alt</Kbd></>, result: <>Transcribes locally and pastes with <Kbd>Ctrl+V</Kbd></> },
+  { action: <>Hold <Kbd>Ctrl</Kbd>, then <Kbd>Win</Kbd></>, result: 'Starts recording and shows red audio bars' },
+  { action: <>Release <Kbd>Ctrl+Win</Kbd></>, result: <>Transcribes locally and pastes with <Kbd>Ctrl+V</Kbd></> },
   { action: 'Click idle overlay', result: 'Toggles recording' },
   { action: <>Hover and click <Kbd>dict</Kbd></>, result: 'Opens the dictionary manager' },
   {
@@ -16,7 +16,7 @@ const USAGE_ROWS: { action: ReactNode; result: ReactNode }[] = [
 const SIGNAL_STEPS = [
   {
     title: 'Capture',
-    description: 'Hold Right Alt. The native recorder captures 16 kHz mono audio while you speak.',
+    description: 'Hold Ctrl, then Win. The native recorder captures 16 kHz mono audio while you speak.',
   },
   {
     title: 'Log-mel features',
@@ -39,7 +39,7 @@ const SIGNAL_STEPS = [
 
 function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="rounded border border-white/15 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[0.8em] text-zinc-200">
+    <kbd className="rounded-md border border-white/15 bg-white/[0.05] px-1.5 py-0.5 font-mono text-[0.8em] text-zinc-200">
       {children}
     </kbd>
   )
@@ -47,23 +47,23 @@ function Kbd({ children }: { children: ReactNode }) {
 
 export function HowItWorks() {
   return (
-    <Section id="how-it-works" className="py-24">
-      <div className="text-center">
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">How it works</span>
-        <h2 className="mt-3 font-display text-3xl font-semibold text-zinc-50 sm:text-4xl">
-          One key, five steps, zero network calls
+    <Section id="how-it-works" className="py-20 sm:py-24">
+      <div className="max-w-2xl">
+        <span className="font-mono text-xs text-muted">How it works</span>
+        <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
+          Ctrl + Win, five steps, zero network calls
         </h2>
       </div>
 
-      <div className="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-2">
-        <div className="overflow-x-auto rounded-xl border border-line">
+      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="overflow-x-auto rounded-lg border border-line bg-surface-raised">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
-              <tr className="border-b border-line bg-white/[0.02]">
-                <th scope="col" className="px-4 py-3 font-display font-medium text-zinc-50">
+              <tr className="border-b border-line bg-white/[0.03]">
+                <th scope="col" className="px-4 py-3 font-medium text-zinc-50">
                   Action
                 </th>
-                <th scope="col" className="px-4 py-3 font-display font-medium text-zinc-50">
+                <th scope="col" className="px-4 py-3 font-medium text-zinc-50">
                   Result
                 </th>
               </tr>
@@ -79,15 +79,15 @@ export function HowItWorks() {
           </table>
         </div>
 
-        <ol className="flex flex-col gap-5">
+        <ol className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface-raised">
           {SIGNAL_STEPS.map((step, i) => (
-            <li key={step.title} className="flex gap-4">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent-record/40 font-mono text-xs text-accent-record">
+            <li key={step.title} className="flex gap-4 border-b border-line p-4 last:border-b-0">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/20 font-mono text-xs text-zinc-200">
                 {i + 1}
               </span>
               <div>
-                <h3 className="font-display text-base text-zinc-50">{step.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-zinc-400">{step.description}</p>
+                <h3 className="text-base font-medium text-zinc-50">{step.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-zinc-400">{step.description}</p>
               </div>
             </li>
           ))}

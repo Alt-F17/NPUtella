@@ -30,7 +30,7 @@ export function Section({ id, className = '', children }: SectionProps) {
     <section
       id={id}
       ref={ref}
-      className={`mx-auto w-full max-w-6xl px-6 ${visible ? 'animate-rise-in' : 'opacity-0'} ${className}`}
+      className={`mx-auto w-full max-w-7xl px-5 sm:px-6 ${visible ? 'animate-rise-in' : 'opacity-0'} ${className}`}
     >
       {children}
     </section>

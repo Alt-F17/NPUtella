@@ -9,12 +9,12 @@ const LINKS = [
 
 export function Footer() {
   return (
-    <footer className="mx-auto w-full max-w-6xl px-6 py-12">
+    <footer className="mx-auto w-full max-w-7xl px-5 py-12 sm:px-6">
       <div className="flex flex-col items-center gap-6 border-t border-line pt-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center gap-2 sm:items-start">
           <div className="flex items-center gap-2">
-            <Logo className="h-6 w-6 text-zinc-500" />
-            <span className="font-display text-base text-zinc-200">NPUtella</span>
+            <Logo className="h-6 w-6 text-zinc-400" />
+            <span className="text-sm font-medium text-zinc-200">NPUtella</span>
           </div>
           <p className="font-mono text-xs text-muted">Local NPU Whisper STT for Snapdragon X Plus</p>
         </div>
@@ -25,7 +25,7 @@ export function Footer() {
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded text-sm text-zinc-400 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+              className="rounded-md text-sm text-zinc-400 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               {link.label}
             </a>

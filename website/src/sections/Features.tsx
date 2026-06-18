@@ -11,9 +11,9 @@ const FEATURES = [
   },
   {
     icon: Keyboard,
-    title: 'One Key, Zero Friction',
+    title: 'Ctrl + Win, Zero Friction',
     description:
-      'Hold Right Alt, speak, release. The transcript pastes wherever your cursor is. No app switching, no clicking record.',
+      'Hold Ctrl, then Win, speak, release. The transcript pastes wherever your cursor is. No app switching, no clicking record.',
   },
   {
     icon: Languages,
@@ -32,22 +32,26 @@ export function Features() {
   const { ref, visible } = useInView<HTMLDivElement>()
 
   return (
-    <Section id="features" className="py-24">
-      <div className="text-center">
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Capabilities</span>
-        <h2 className="mt-3 font-display text-3xl font-semibold text-zinc-50 sm:text-4xl">
+    <Section id="features" className="py-20 sm:py-24">
+      <div className="max-w-2xl">
+        <span className="font-mono text-xs text-muted">Capabilities</span>
+        <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
           Built for the device, not the cloud
         </h2>
+        <p className="mt-3 text-sm leading-6 text-zinc-400">
+          A small desktop utility with the parts that matter: privacy, speed, keyboard-first capture, and correction where
+          Whisper needs help.
+        </p>
       </div>
-      <div ref={ref} className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div ref={ref} className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map(({ icon: Icon, title, description }, i) => (
           <div
             key={title}
             style={visible ? { animationDelay: `${i * 70}ms` } : undefined}
-            className={`rounded-xl border border-line bg-surface-raised/60 p-6 ${visible ? 'animate-rise-in' : 'opacity-0'}`}
+            className={`bg-surface-raised p-6 ${visible ? 'animate-rise-in' : 'opacity-0'}`}
           >
-            <Icon className="h-5 w-5 text-accent-record" aria-hidden="true" />
-            <h3 className="mt-4 font-display text-lg text-zinc-50">{title}</h3>
+            <Icon className="h-5 w-5 text-zinc-200" aria-hidden="true" />
+            <h3 className="mt-4 text-base font-medium text-zinc-50">{title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-zinc-400">{description}</p>
           </div>
         ))}

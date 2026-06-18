@@ -63,7 +63,7 @@ export function DictionaryManager({ className = '' }: DictionaryManagerProps) {
         <button
           type="button"
           onClick={() => setClosed(false)}
-          className="rounded px-2 py-1 text-sm text-zinc-200 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+          className="rounded-md px-2 py-1 text-sm text-zinc-200 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Reopen
         </button>
@@ -76,27 +76,27 @@ export function DictionaryManager({ className = '' }: DictionaryManagerProps) {
       className={`animate-fade-in rounded-lg border border-line bg-surface-panel p-5 shadow-2xl shadow-black/60 ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-display text-xl text-zinc-50">Dictionary</h3>
+        <h3 className="text-lg font-medium text-zinc-50">Dictionary</h3>
         <div className="flex items-center gap-4 font-mono text-xs uppercase tracking-wide">
           <button
             type="button"
             disabled={!dirty}
             onClick={save}
-            className="text-zinc-300 transition-colors duration-150 ease-snap hover:text-white disabled:text-zinc-600 disabled:hover:text-zinc-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+            className="rounded-md text-zinc-300 transition-colors duration-150 ease-snap hover:text-white disabled:text-zinc-600 disabled:hover:text-zinc-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Save
           </button>
           <button
             type="button"
             onClick={reload}
-            className="text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+            className="rounded-md text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Reload
           </button>
           <button
             type="button"
             onClick={() => setClosed(true)}
-            className="text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+            className="rounded-md text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Close
           </button>

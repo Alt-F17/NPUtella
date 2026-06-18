@@ -14,7 +14,7 @@ const LANGUAGES: { value: DictionaryLanguage; label: string }[] = [
 ]
 
 function inputClasses() {
-  return 'w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-sm text-zinc-100 transition-colors duration-150 ease-snap placeholder:text-zinc-500 hover:border-white/20 focus-visible:border-accent-record focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-record'
+  return 'w-full rounded-md border border-white/10 bg-black/35 px-2.5 py-2 text-sm text-zinc-100 transition-colors duration-150 ease-snap placeholder:text-zinc-500 hover:border-white/20 focus-visible:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white'
 }
 
 export function EntryEditor({ entry, onChange, onDelete }: EntryEditorProps) {
@@ -33,7 +33,7 @@ export function EntryEditor({ entry, onChange, onDelete }: EntryEditorProps) {
         <button
           type="button"
           onClick={onDelete}
-          className="rounded px-1.5 py-0.5 text-sm text-zinc-300 transition-colors duration-150 ease-snap hover:text-accent-record focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+          className="rounded-md px-1.5 py-0.5 text-sm text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Delete
         </button>
@@ -87,10 +87,10 @@ export function EntryEditor({ entry, onChange, onDelete }: EntryEditorProps) {
               aria-pressed={entry.language === value}
               className={[
                 'rounded px-2.5 py-1 text-sm transition-colors duration-150 ease-snap',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
                 entry.language === value
-                  ? 'bg-accent-select text-white'
-                  : 'text-zinc-300 hover:bg-white/5',
+                  ? 'bg-white text-black'
+                  : 'text-zinc-300 hover:bg-white/[0.06]',
               ].join(' ')}
             >
               {label}

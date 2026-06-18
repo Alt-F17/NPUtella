@@ -16,21 +16,21 @@ const NAV_LINKS = [
 
 function Header() {
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-surface/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <header className="sticky top-0 z-50 border-b border-line bg-black/75 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 sm:px-6">
         <a
           href="#hero"
-          className="flex items-center gap-2 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+          className="flex items-center gap-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          <Logo className="h-6 w-6 text-zinc-300" />
-          <span className="font-display text-lg text-zinc-50">NPUtella</span>
+          <Logo className="h-6 w-6 text-zinc-50" />
+          <span className="text-sm font-medium text-zinc-50">NPUtella</span>
         </a>
         <nav aria-label="Primary" className="hidden items-center gap-6 sm:flex">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="rounded text-sm text-zinc-400 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+              className="rounded-md text-sm text-zinc-400 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               {link.label}
             </a>
@@ -40,7 +40,7 @@ function Header() {
           href={GITHUB_REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-sm text-zinc-200 transition-all duration-200 ease-snap hover:border-white/30 hover:bg-white/5 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+          className="flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-sm text-zinc-200 transition-[background-color,border-color,transform] duration-200 ease-snap hover:border-white/30 hover:bg-white/[0.06] active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           <Github className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">GitHub</span>
@@ -52,7 +52,7 @@ function Header() {
 
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-black">
       <Header />
       <main className="flex flex-1 flex-col">
         <Hero />

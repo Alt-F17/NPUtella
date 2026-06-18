@@ -18,7 +18,7 @@ export function EntryList({ entries, selectedId, onSelect, onAdd }: EntryListPro
         <button
           type="button"
           onClick={onAdd}
-          className="rounded px-1.5 py-0.5 text-sm text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record"
+          className="rounded-md px-1.5 py-0.5 text-sm text-zinc-300 transition-colors duration-150 ease-snap hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Add
         </button>
@@ -35,9 +35,9 @@ export function EntryList({ entries, selectedId, onSelect, onAdd }: EntryListPro
               style={visible ? { animationDelay: `${i * 50}ms` } : undefined}
               className={[
                 'truncate rounded px-2 py-1.5 text-left text-sm transition-colors duration-150 ease-snap',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
                 visible ? 'animate-rise-in' : 'opacity-0',
-                selected ? 'bg-accent-select text-white' : 'text-zinc-300 hover:bg-white/5',
+                selected ? 'bg-white text-black' : 'text-zinc-300 hover:bg-white/[0.06]',
               ].join(' ')}
             >
               {entry.written.trim() || 'Untitled'}

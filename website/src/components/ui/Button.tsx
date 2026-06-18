@@ -9,8 +9,8 @@ interface ButtonProps {
 }
 
 const VARIANTS = {
-  primary: 'bg-accent-record text-white shadow-lg shadow-accent-record/20 hover:bg-[#ff5147]',
-  secondary: 'border border-white/15 text-zinc-100 hover:border-white/30 hover:bg-white/5',
+  primary: 'border border-white bg-white text-black hover:bg-zinc-200',
+  secondary: 'border border-white/15 text-zinc-100 hover:border-white/30 hover:bg-white/[0.06]',
 }
 
 export function Button({ href, variant = 'primary', icon, children, className = '' }: ButtonProps) {
@@ -20,8 +20,8 @@ export function Button({ href, variant = 'primary', icon, children, className = 
       href={href}
       className={[
         'inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium',
-        'transition-all duration-200 ease-snap active:scale-[0.97]',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-record',
+        'transition-[background-color,border-color,color,transform] duration-200 ease-snap active:scale-[0.97]',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
         VARIANTS[variant],
         className,
       ].join(' ')}
