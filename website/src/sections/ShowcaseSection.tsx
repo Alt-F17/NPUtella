@@ -17,7 +17,7 @@ export function ShowcaseSection() {
           The native surfaces, rebuilt live.
         </h2>
         <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
-          These are the same components, rebuilt in React straight from the app&rsquo;s Rust source &mdash; not a
+          These are the same components, rebuilt in React straight from the app&rsquo;s Rust source - not a
           video or a still image.
         </p>
       </div>
@@ -45,7 +45,7 @@ export function ShowcaseSection() {
         <div id="dictionary-demo" className="flex flex-col">
           <h3 className="text-lg font-medium text-zinc-50">Dictionary manager</h3>
           <p className="mt-2 text-sm leading-6 text-zinc-400">
-            Custom written forms, comma-separated aliases, phonetic matching, and per-entry priority &mdash; try it,
+            Custom written forms, comma-separated aliases, phonetic matching, and per-entry priority - try it,
             it&rsquo;s fully interactive.
           </p>
           <DictionaryManager className="mt-6" />

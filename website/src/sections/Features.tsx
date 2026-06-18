@@ -7,7 +7,7 @@ const FEATURES = [
     icon: Lock,
     title: '100% Local',
     description:
-      'Audio never leaves your machine. Whisper-Base runs on-device through the Snapdragon NPU — no network calls, no cloud inference.',
+      'Audio never leaves your machine. Whisper-Base runs on-device through the Snapdragon NPU - no network calls, no cloud inference.',
   },
   {
     icon: Keyboard,

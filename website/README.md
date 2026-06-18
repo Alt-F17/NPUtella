@@ -6,7 +6,7 @@ manager as live React components instead of screenshots.
 ## Stack
 
 Vite + React + TypeScript + Tailwind CSS. Self-hosted fonts via `@fontsource` (Bricolage Grotesque, IBM Plex Sans,
-IBM Plex Mono). No backend, no router — single page.
+IBM Plex Mono). No backend, no router - single page.
 
 ## Development
 
