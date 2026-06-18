@@ -34,8 +34,7 @@ export function Features() {
   return (
     <Section id="features" className="py-20 sm:py-24">
       <div className="max-w-2xl">
-        <span className="font-mono text-xs text-muted">Capabilities</span>
-        <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
+        <h2 className="text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
           Built for the device, not the cloud
         </h2>
         <p className="mt-3 text-sm leading-6 text-zinc-400">

@@ -49,8 +49,7 @@ export function HowItWorks() {
   return (
     <Section id="how-it-works" className="py-20 sm:py-24">
       <div className="max-w-2xl">
-        <span className="font-mono text-xs text-muted">How it works</span>
-        <h2 className="mt-3 text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
+        <h2 className="text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
           Ctrl + Win, five steps, zero network calls
         </h2>
       </div>

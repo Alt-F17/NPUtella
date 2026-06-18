@@ -1,4 +1,5 @@
 import { Github } from 'lucide-react'
+import { AppBackground } from './components/decor/AppBackground'
 import { Logo } from './components/icons/Logo'
 import { Hero } from './sections/Hero'
 import { Features } from './sections/Features'
@@ -52,7 +53,8 @@ function Header() {
 
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-black">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-black">
+      <AppBackground />
       <Header />
       <main className="flex flex-1 flex-col">
         <Hero />

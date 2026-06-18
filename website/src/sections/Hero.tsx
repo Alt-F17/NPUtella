@@ -1,5 +1,4 @@
 import { Download, Github } from 'lucide-react'
-import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Section } from '../components/ui/Section'
 import { PillWidget } from '../components/pill/PillWidget'
@@ -17,8 +16,7 @@ export function Hero() {
     <Section id="hero" className="relative min-h-[calc(100dvh-57px)] py-16 sm:py-20 lg:py-24">
       <div className="grid min-h-[calc(100dvh-12rem)] grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div className="relative z-10 max-w-2xl">
-          <Badge>Snapdragon X Plus / local Whisper STT</Badge>
-          <h1 className="mt-6 text-balance text-5xl font-semibold leading-[0.95] tracking-[-0.04em] text-zinc-50 sm:text-6xl lg:text-7xl">
+          <h1 className="text-balance text-5xl font-semibold leading-[0.95] tracking-[-0.04em] text-zinc-50 sm:text-6xl lg:text-7xl">
             Dictation that stays on your machine.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-7 text-zinc-300 sm:text-lg">

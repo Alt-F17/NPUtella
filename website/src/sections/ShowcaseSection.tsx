@@ -1,4 +1,3 @@
-import { Badge } from '../components/ui/Badge'
 import { Section } from '../components/ui/Section'
 import { DictionaryManager } from '../components/dictionary/DictionaryManager'
 import { PillWidget } from '../components/pill/PillWidget'
@@ -14,8 +13,7 @@ export function ShowcaseSection() {
   return (
     <Section id="showcase" className="py-20 sm:py-24">
       <div className="max-w-2xl">
-        <Badge>Recreated from the app&rsquo;s source, not a screenshot</Badge>
-        <h2 className="mt-5 text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
+        <h2 className="text-balance text-3xl font-semibold tracking-[-0.03em] text-zinc-50 sm:text-4xl">
           The native surfaces, rebuilt live.
         </h2>
         <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
