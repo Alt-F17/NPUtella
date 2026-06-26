@@ -23,6 +23,13 @@ export function Hero() {
             Hold Ctrl, then Win, speak, release. NPUtella runs Whisper through Qualcomm&rsquo;s NPU, applies
             your dictionary, and pastes the result wherever your cursor already is.
           </p>
+          <div className="mt-7 inline-flex items-baseline gap-3 whitespace-nowrap rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm text-zinc-300">
+            <span className="font-medium text-zinc-50">Trusted by</span>
+            <span className="font-mono text-base tabular-nums text-zinc-50">
+              <span id="vercount_value_site_uv">Loading</span>
+            </span>
+            <span>users</span>
+          </div>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button href={GITHUB_RELEASES_URL} variant="primary" icon={<Download className="h-4 w-4" />}>
               Download for Windows
