@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Download, Github } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Section } from '../components/ui/Section'
@@ -7,6 +8,15 @@ import { GITHUB_RELEASES_URL, GITHUB_REPO_URL } from '../lib/constants'
 
 export function Hero() {
   const { phase, resultText, language, cycleLanguage, setPaused } = usePillDemo()
+
+  useEffect(() => {
+    if (document.getElementById('vercount-script')) return
+
+    const script = document.createElement('script')
+    script.id = 'vercount-script'
+    script.src = 'https://events.vercount.one/js'
+    document.body.appendChild(script)
+  }, [])
 
   function scrollToShowcase() {
     document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
